@@ -146,13 +146,13 @@ public class Ant2MavenApplication implements Callable<Integer> {
             log.info("Ant to Maven Migration Tool v1.1.0");
             log.info("=".repeat(60));
 
-            // Get Artifactory password from environment if not provided
+            // Récupérer le mot de passe Artifactory depuis l'environnement si non fourni
             String effectiveArtifactoryPassword = artifactoryPassword;
             if (effectiveArtifactoryPassword == null || effectiveArtifactoryPassword.isBlank()) {
                 effectiveArtifactoryPassword = System.getenv("ARTIFACTORY_PASSWORD");
             }
 
-            // Build configuration
+            // Construire la configuration
             MigrationConfig config = MigrationConfig.builder()
                 .projectRoot(projectRoot)
                 .outputDir(outputDir)
@@ -163,7 +163,7 @@ public class Ant2MavenApplication implements Callable<Integer> {
                 .skipMavenCentralLookup(skipMavenCentral)
                 .verbose(verbose)
                 .basePackage(basePackage)
-                // Artifactory settings
+                // Paramètres Artifactory
                 .artifactoryUrl(artifactoryUrl)
                 .artifactoryCertPath(artifactoryCertPath)
                 .artifactoryReleaseRepo(artifactoryReleaseRepo)
@@ -173,7 +173,7 @@ public class Ant2MavenApplication implements Callable<Integer> {
                 .deploymentMode(deploymentMode)
                 .build();
 
-            // Log configuration
+            // Afficher la configuration
             log.info("Project: {}", config.projectRoot());
             log.info("Output: {}", config.outputDir());
             log.info("Profile: {}", config.buildVariant());
@@ -192,7 +192,7 @@ public class Ant2MavenApplication implements Callable<Integer> {
                 log.info("Artifactory: not configured (using Maven Central only)");
             }
 
-            // Phase 1: Scan project structure
+            // Phase 1 : Scanner la structure du projet
             log.info("");
             log.info("Phase 1: Scanning project structure...");
             ProjectScanner scanner = new ProjectScanner();
@@ -206,7 +206,7 @@ public class Ant2MavenApplication implements Callable<Integer> {
             log.info("Found {} Java source files", project.sourceLayout().mainJavaFileCount());
             log.info("Found {} internal dependencies", project.internalDeps().size());
 
-            // Phase 2: Analyze dependencies
+            // Phase 2 : Analyser les dépendances
             log.info("");
             log.info("Phase 2: Analyzing dependencies...");
             DependencyAnalyzer analyzer = new DependencyAnalyzer(config);
@@ -216,7 +216,7 @@ public class Ant2MavenApplication implements Callable<Integer> {
             log.info("Unresolved: {} dependencies", analysis.unresolved().size());
             log.info("Success rate: {}%", String.format("%.1f", analysis.successRate()));
 
-            // Generate reports (even in dry-run mode)
+            // Générer les rapports (même en mode dry-run)
             log.info("");
             log.info("Generating reports...");
             ReportGenerator reportGenerator = new ReportGenerator(config);
@@ -229,13 +229,13 @@ public class Ant2MavenApplication implements Callable<Integer> {
                 return 0;
             }
 
-            // Phase 3: Generate Maven project
+            // Phase 3 : Générer le projet Maven
             log.info("");
             log.info("Phase 3: Generating Maven project...");
             ProjectGenerator generator = new ProjectGenerator(config);
             ProjectGenerator.GenerationResult result = generator.generate(project, analysis);
 
-            // Generate additional reports and scripts
+            // Générer les rapports et scripts additionnels
             reportGenerator.generateLibNotFoundCsv(analysis, config.outputDir());
             reportGenerator.generateInstallScript(analysis, config.outputDir(), analyzer.getVersionExtractor());
 
@@ -244,7 +244,7 @@ public class Ant2MavenApplication implements Callable<Integer> {
                     analyzer.getVersionExtractor(), analyzer.getArtifactoryClient());
             }
 
-            // Summary
+            // Résumé
             log.info("");
             log.info("=".repeat(60));
             log.info("Migration complete!");
