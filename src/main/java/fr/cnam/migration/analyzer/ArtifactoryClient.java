@@ -27,13 +27,13 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Client for JFrog Artifactory with SSL certificate support.
+ * Client pour JFrog Artifactory avec support de certificat SSL.
  *
- * Features:
- * - Search artifacts by SHA-1 checksum
- * - Check if artifact exists
- * - Deploy/upload artifacts
- * - Custom SSL certificate support for enterprise environments
+ * Fonctionnalités :
+ * - Recherche d'artefacts par checksum SHA-1
+ * - Vérification de l'existence d'un artefact
+ * - Déploiement/upload d'artefacts
+ * - Support de certificat SSL personnalisé pour environnements enterprise
  */
 public class ArtifactoryClient {
 
@@ -50,14 +50,14 @@ public class ArtifactoryClient {
     }
 
     /**
-     * Creates an HTTP client with optional custom SSL certificate.
+     * Crée un client HTTP avec certificat SSL personnalisé optionnel.
      */
     private HttpClient createHttpClient() {
         HttpClient.Builder builder = HttpClient.newBuilder()
             .version(HttpClient.Version.HTTP_1_1)
             .connectTimeout(Duration.ofSeconds(30));
 
-        // If a certificate is configured, set up custom SSL context
+        // Si un certificat est configuré, configurer le contexte SSL personnalisé
         if (config.artifactoryCertPath() != null && Files.exists(config.artifactoryCertPath())) {
             try {
                 SSLContext sslContext = createSslContext(config.artifactoryCertPath());
@@ -72,33 +72,33 @@ public class ArtifactoryClient {
     }
 
     /**
-     * Creates an SSL context with the specified certificate.
+     * Crée un contexte SSL avec le certificat spécifié.
      */
     private SSLContext createSslContext(Path certPath) throws Exception {
-        // Load the certificate
+        // Charger le certificat
         CertificateFactory cf = CertificateFactory.getInstance("X.509");
         Certificate cert;
         try (InputStream is = Files.newInputStream(certPath)) {
             cert = cf.generateCertificate(is);
         }
 
-        // Create a KeyStore containing our trusted certificate
+        // Créer un KeyStore contenant notre certificat de confiance
         KeyStore keyStore = KeyStore.getInstance(KeyStore.getDefaultType());
         keyStore.load(null, null);
         keyStore.setCertificateEntry("artifactory", cert);
 
-        // Create TrustManager that trusts our certificate
+        // Créer un TrustManager qui fait confiance à notre certificat
         TrustManagerFactory tmf = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
         tmf.init(keyStore);
 
-        // Also include the default trusted certificates
+        // Inclure également les certificats de confiance par défaut
         TrustManagerFactory defaultTmf = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
         defaultTmf.init((KeyStore) null);
 
-        // Combine our trust managers with the default ones
+        // Combiner nos trust managers avec ceux par défaut
         TrustManager[] trustManagers = createCombinedTrustManagers(tmf.getTrustManagers(), defaultTmf.getTrustManagers());
 
-        // Create SSL context
+        // Créer le contexte SSL
         SSLContext sslContext = SSLContext.getInstance("TLS");
         sslContext.init(null, trustManagers, null);
 
@@ -106,7 +106,7 @@ public class ArtifactoryClient {
     }
 
     /**
-     * Combines custom and default trust managers.
+     * Combine les trust managers personnalisés et par défaut.
      */
     private TrustManager[] createCombinedTrustManagers(TrustManager[] custom, TrustManager[] defaults) {
         List<X509TrustManager> x509Managers = new ArrayList<>();
@@ -122,12 +122,12 @@ public class ArtifactoryClient {
             }
         }
 
-        // Create a composite trust manager
+        // Créer un trust manager composite
         return new TrustManager[]{new CompositeX509TrustManager(x509Managers)};
     }
 
     /**
-     * Searches for an artifact by SHA-1 checksum in Artifactory.
+     * Recherche un artefact par checksum SHA-1 dans Artifactory.
      */
     public Optional<MavenCoordinate> searchBySha1(String sha1) {
         if (!config.isArtifactoryConfigured() || sha1 == null || sha1.isBlank()) {
@@ -139,7 +139,7 @@ public class ArtifactoryClient {
 
     private Optional<MavenCoordinate> doSearchBySha1(String sha1) {
         try {
-            // Artifactory AQL search by checksum
+            // Recherche AQL Artifactory par checksum
             String url = config.artifactoryUrl() + "/api/search/checksum?sha1=" + sha1;
 
             HttpRequest.Builder requestBuilder = HttpRequest.newBuilder()
@@ -168,7 +168,7 @@ public class ArtifactoryClient {
     }
 
     /**
-     * Checks if an artifact exists in Artifactory.
+     * Vérifie si un artefact existe dans Artifactory.
      */
     public boolean exists(MavenCoordinate coord) {
         if (!config.isArtifactoryConfigured()) {
@@ -203,12 +203,12 @@ public class ArtifactoryClient {
     }
 
     /**
-     * Deploys/uploads an artifact to Artifactory.
+     * Déploie/uploade un artefact vers Artifactory.
      *
-     * @param jarPath Path to the JAR file
-     * @param coord Maven coordinates for the artifact
-     * @param isSnapshot Whether this is a snapshot version
-     * @return true if deployment succeeded
+     * @param jarPath Chemin vers le fichier JAR
+     * @param coord Coordonnées Maven pour l'artefact
+     * @param isSnapshot Si c'est une version snapshot
+     * @return true si le déploiement a réussi
      */
     public boolean deploy(Path jarPath, MavenCoordinate coord, boolean isSnapshot) {
         if (!config.isArtifactoryConfigured()) {
@@ -251,13 +251,13 @@ public class ArtifactoryClient {
     }
 
     /**
-     * Generates a deployment script for artifacts that should be uploaded.
-     * This is useful when direct upload is not possible (e.g., network restrictions).
+     * Génère un script de déploiement pour les artefacts à uploader.
+     * Utile quand l'upload direct n'est pas possible (ex: restrictions réseau).
      */
     public String generateDeployCommand(Path jarPath, MavenCoordinate coord, boolean isSnapshot) {
         String repo = isSnapshot ? config.artifactorySnapshotRepo() : config.artifactoryReleaseRepo();
 
-        // Generate curl command
+        // Générer la commande curl
         StringBuilder cmd = new StringBuilder();
         cmd.append("curl -X PUT ");
 
@@ -278,7 +278,7 @@ public class ArtifactoryClient {
     }
 
     /**
-     * Adds authentication headers to the request.
+     * Ajoute les en-têtes d'authentification à la requête.
      */
     private void addAuthHeaders(HttpRequest.Builder builder) {
         if (config.artifactoryUsername() != null && config.artifactoryPassword() != null) {
@@ -289,7 +289,7 @@ public class ArtifactoryClient {
     }
 
     /**
-     * Builds the artifact path in the repository.
+     * Construit le chemin de l'artefact dans le repository.
      */
     private String buildArtifactPath(MavenCoordinate coord, String repo) {
         String groupPath = coord.groupId().replace('.', '/');
@@ -298,11 +298,11 @@ public class ArtifactoryClient {
     }
 
     /**
-     * Parses the Artifactory search response to extract Maven coordinates.
+     * Parse la réponse de recherche Artifactory pour extraire les coordonnées Maven.
      */
     private Optional<MavenCoordinate> parseSearchResponse(String json) {
-        // Simple JSON parsing for Artifactory response
-        // Response format: {"results":[{"uri":"...","downloadUri":"..."}]}
+        // Parsing JSON simple pour la réponse Artifactory
+        // Format de réponse : {"results":[{"uri":"...","downloadUri":"..."}]}
 
         Pattern uriPattern = Pattern.compile("\"downloadUri\"\\s*:\\s*\"([^\"]+)\"");
         Matcher matcher = uriPattern.matcher(json);
@@ -316,22 +316,22 @@ public class ArtifactoryClient {
     }
 
     /**
-     * Parses Maven coordinates from an artifact path.
+     * Parse les coordonnées Maven depuis un chemin d'artefact.
      */
     private Optional<MavenCoordinate> parseCoordinatesFromPath(String path) {
-        // Path format: .../groupId/artifactId/version/artifactId-version.jar
+        // Format du chemin : .../groupId/artifactId/version/artifactId-version.jar
         Pattern pathPattern = Pattern.compile(".*/([^/]+)/([^/]+)/([^/]+)/([^/]+)\\.jar$");
         Matcher matcher = pathPattern.matcher(path);
 
         if (matcher.find()) {
-            // This gives us the last 3 path segments before the filename
-            // Need to reconstruct the full path to get groupId
+            // Cela nous donne les 3 derniers segments de chemin avant le nom de fichier
+            // Besoin de reconstruire le chemin complet pour obtenir le groupId
             String[] parts = path.split("/");
             if (parts.length >= 4) {
                 String version = parts[parts.length - 2];
                 String artifactId = parts[parts.length - 3];
 
-                // Find where the groupId starts (after repository name)
+                // Trouver où le groupId commence (après le nom du repository)
                 StringBuilder groupId = new StringBuilder();
                 boolean foundRepo = false;
                 for (int i = 0; i < parts.length - 3; i++) {
@@ -359,7 +359,7 @@ public class ArtifactoryClient {
     }
 
     /**
-     * Returns cache statistics for debugging.
+     * Retourne les statistiques du cache pour débogage.
      */
     public String getCacheStats() {
         return String.format("SHA1 cache: %d entries, Exists cache: %d entries",
@@ -367,7 +367,7 @@ public class ArtifactoryClient {
     }
 
     /**
-     * Tests the connection to Artifactory.
+     * Teste la connexion à Artifactory.
      */
     public boolean testConnection() {
         if (!config.isArtifactoryConfigured()) {
@@ -396,7 +396,7 @@ public class ArtifactoryClient {
     }
 
     /**
-     * Composite X509TrustManager that combines multiple trust managers.
+     * X509TrustManager composite qui combine plusieurs trust managers.
      */
     private static class CompositeX509TrustManager implements X509TrustManager {
         private final List<X509TrustManager> trustManagers;
@@ -412,7 +412,7 @@ public class ArtifactoryClient {
                     tm.checkClientTrusted(chain, authType);
                     return;
                 } catch (java.security.cert.CertificateException e) {
-                    // Try next trust manager
+                    // Essayer le trust manager suivant
                 }
             }
             throw new java.security.cert.CertificateException("None of the trust managers trust this certificate chain");
@@ -425,7 +425,7 @@ public class ArtifactoryClient {
                     tm.checkServerTrusted(chain, authType);
                     return;
                 } catch (java.security.cert.CertificateException e) {
-                    // Try next trust manager
+                    // Essayer le trust manager suivant
                 }
             }
             throw new java.security.cert.CertificateException("None of the trust managers trust this certificate chain");

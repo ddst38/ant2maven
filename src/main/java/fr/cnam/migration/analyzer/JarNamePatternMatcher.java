@@ -10,7 +10,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Matches JAR filenames to Maven coordinates using regex patterns.
+ * Fait correspondre les noms de fichiers JAR aux coordonnées Maven en utilisant des patterns regex.
  */
 public class JarNamePatternMatcher {
 
@@ -215,7 +215,7 @@ public class JarNamePatternMatcher {
     );
 
     /**
-     * Attempts to match a JAR filename to Maven coordinates.
+     * Tente de faire correspondre un nom de fichier JAR à des coordonnées Maven.
      */
     public Optional<MavenCoordinate> match(String jarName) {
         for (PatternRule rule : RULES) {

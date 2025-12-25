@@ -16,31 +16,31 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Comprehensive JAR version extractor that uses multiple strategies to determine
- * the version of a JAR file.
+ * Extracteur de version JAR complet qui utilise plusieurs stratégies pour déterminer
+ * la version d'un fichier JAR.
  *
- * Strategies (in order of preference):
- * 1. Filename patterns (e.g., artifact-1.2.3.jar)
- * 2. MANIFEST.MF attributes (Implementation-Version, Bundle-Version, etc.)
+ * Stratégies (par ordre de préférence) :
+ * 1. Patterns de nom de fichier (ex: artifact-1.2.3.jar)
+ * 2. Attributs MANIFEST.MF (Implementation-Version, Bundle-Version, etc.)
  * 3. META-INF/maven/.../pom.properties
- * 4. version.properties or similar files inside the JAR
- * 5. Fall back to SHA-based versioning for unversioned JARs
+ * 4. version.properties ou fichiers similaires dans le JAR
+ * 5. Fall back vers versionnement basé sur SHA pour les JARs non versionnés
  */
 public class JarVersionExtractor {
 
     private static final Logger log = LoggerFactory.getLogger(JarVersionExtractor.class);
 
-    // Filename patterns for version extraction
+    // Patterns de nom de fichier pour extraction de version
     private static final List<Pattern> VERSION_PATTERNS = List.of(
-        // Standard Maven pattern: artifact-1.2.3.jar or artifact-1.2.3-classifier.jar
+        // Pattern Maven standard : artifact-1.2.3.jar ou artifact-1.2.3-classifier.jar
         Pattern.compile("^(.+?)-(\\d+\\.\\d+(?:\\.\\d+)?(?:[.-][A-Za-z0-9]+)*)\\.jar$"),
-        // DEPFAB pattern with version: DEPFAB.XXX_Y-1.0.16-suffix.jar
+        // Pattern DEPFAB avec version : DEPFAB.XXX_Y-1.0.16-suffix.jar
         Pattern.compile("^DEPFAB\\.([A-Z0-9_]+)-(\\d+\\.\\d+\\.\\d+)-.+\\.jar$"),
-        // Service pattern: ServiceXXX_1.0.client.jar
+        // Pattern Service : ServiceXXX_1.0.client.jar
         Pattern.compile("^(Service[A-Z]+)_(\\d+\\.\\d+)\\.\\w+\\.jar$"),
-        // jk-socle pattern: jk-socle-xxx-1.2.5.jar
+        // Pattern jk-socle : jk-socle-xxx-1.2.5.jar
         Pattern.compile("^(jk-socle-[a-z-]+)-(\\d+\\.\\d+\\.\\d+)\\.jar$"),
-        // s8 pattern: s8h-xxx-1.2.0.jar
+        // Pattern s8 : s8h-xxx-1.2.0.jar
         Pattern.compile("^(s8[a-z]?-[a-zA-Z-]+)-(\\d+\\.\\d+\\.\\d+)\\.jar$"),
         // CNAM project pattern: SOCA010000J-1.0.0-suffix.jar
         Pattern.compile("^([A-Z]+\\d+[A-Z])-(\\d+\\.\\d+\\.\\d+)-.+\\.jar$")
