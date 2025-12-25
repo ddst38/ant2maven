@@ -11,44 +11,44 @@ import java.nio.file.attribute.BasicFileAttributes;
 import java.util.function.Predicate;
 
 /**
- * Creates Maven directory structure and copies source files.
+ * Crée la structure de répertoires Maven et copie les fichiers sources.
  */
 public class StructureCreator {
 
     private static final Logger log = LoggerFactory.getLogger(StructureCreator.class);
 
     /**
-     * Creates the complete Maven directory structure.
+     * Crée la structure complète des répertoires Maven.
      */
     public void createStructure(ProjectStructure project, Path outputDir) throws IOException {
         log.info("Creating Maven structure in: {}", outputDir);
 
-        // Create parent directories
+        // Créer les répertoires parents
         Files.createDirectories(outputDir);
 
-        // Create module directories based on project type
+        // Créer les répertoires de modules basés sur le type de projet
         String moduleName = project.name().toLowerCase().replace("_j", "");
 
         Path webModule = outputDir.resolve(moduleName + "-web");
         Path earModule = outputDir.resolve(moduleName + "-ear");
         Path liblocale = outputDir.resolve("liblocale");
 
-        // Create web module structure
+        // Créer la structure du module web
         createWebModuleStructure(webModule);
 
-        // Create EAR module structure
+        // Créer la structure du module EAR
         createEarModuleStructure(earModule);
 
-        // Create liblocale directory
+        // Créer le répertoire liblocale
         Files.createDirectories(liblocale);
 
-        // Copy source files
+        // Copier les fichiers sources
         copySourceFiles(project, webModule);
 
-        // Copy EAR configuration
+        // Copier la configuration EAR
         copyEarConfiguration(project, earModule);
 
-        // Copy internal JARs to liblocale
+        // Copier les JARs internes vers liblocale
         copyInternalJars(project, liblocale);
 
         log.info("Directory structure created successfully");
@@ -67,33 +67,33 @@ public class StructureCreator {
     }
 
     /**
-     * Copies source files from the original project to Maven structure.
+     * Copie les fichiers sources du projet original vers la structure Maven.
      */
     private void copySourceFiles(ProjectStructure project, Path webModule) throws IOException {
         ProjectStructure.SourceLayout layout = project.sourceLayout();
 
-        // Copy main Java sources
+        // Copier les sources Java principales
         if (layout.mainJavaDir() != null && Files.exists(layout.mainJavaDir())) {
             copyDirectory(layout.mainJavaDir(), webModule.resolve("src/main/java"),
                 path -> true);
             log.info("Copied main Java sources: {} files", layout.mainJavaFileCount());
         }
 
-        // Copy main resources
+        // Copier les ressources principales
         if (layout.mainResourcesDir() != null && Files.exists(layout.mainResourcesDir())) {
             copyDirectory(layout.mainResourcesDir(), webModule.resolve("src/main/resources"),
                 path -> !isExcludedConfig(path));
             log.info("Copied main resources");
         }
 
-        // Copy webapp (excluding WEB-INF/lib)
+        // Copier webapp (en excluant WEB-INF/lib)
         if (layout.webappDir() != null && Files.exists(layout.webappDir())) {
             copyDirectory(layout.webappDir(), webModule.resolve("src/main/webapp"),
                 path -> !path.toString().contains("WEB-INF" + FileSystems.getDefault().getSeparator() + "lib"));
             log.info("Copied webapp content");
         }
 
-        // Copy test sources
+        // Copier les sources de test
         if (layout.testJavaDir() != null && Files.exists(layout.testJavaDir())) {
             copyDirectory(layout.testJavaDir(), webModule.resolve("src/test/java"),
                 path -> true);

@@ -12,7 +12,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 /**
- * Main generator that orchestrates Maven project creation.
+ * Générateur principal qui orchestre la création du projet Maven.
  */
 public class ProjectGenerator {
 
@@ -29,7 +29,7 @@ public class ProjectGenerator {
     }
 
     /**
-     * Generates the complete Maven project.
+     * Génère le projet Maven complet.
      */
     public GenerationResult generate(ProjectStructure project, AnalysisResult analysis)
             throws IOException {
@@ -38,23 +38,23 @@ public class ProjectGenerator {
 
         List<Path> createdFiles = new ArrayList<>();
 
-        // Create directory structure and copy files
+        // Créer la structure de répertoires et copier les fichiers
         structureCreator.createStructure(project, outputDir);
 
-        // Generate parent POM
+        // Générer le POM parent
         Path parentPom = generateParentPom(project, analysis, outputDir);
         createdFiles.add(parentPom);
 
-        // Generate WAR module POM
+        // Générer le POM du module WAR
         String moduleName = project.name().toLowerCase().replace("_j", "");
         Path warPom = generateWarPom(project, analysis, outputDir.resolve(moduleName + "-web"));
         createdFiles.add(warPom);
 
-        // Generate EAR module POM
+        // Générer le POM du module EAR
         Path earPom = generateEarPom(project, outputDir.resolve(moduleName + "-ear"));
         createdFiles.add(earPom);
 
-        // Install Maven wrapper
+        // Installer le Maven wrapper
         installMavenWrapper(outputDir);
         createdFiles.add(outputDir.resolve("mvnw"));
         createdFiles.add(outputDir.resolve("mvnw.cmd"));
@@ -65,7 +65,7 @@ public class ProjectGenerator {
     }
 
     /**
-     * Generates the parent POM.
+     * Génère le POM parent.
      */
     private Path generateParentPom(ProjectStructure project, AnalysisResult analysis,
                                    Path outputDir) {
@@ -78,23 +78,23 @@ public class ProjectGenerator {
         model.put("version", "1.0.0-SNAPSHOT");
         model.put("projectName", project.name());
 
-        // Modules
+        // Les modules
         model.put("modules", List.of(moduleName + "-web", moduleName + "-ear"));
 
-        // Version properties
+        // Propriétés de version
         Map<String, String> properties = buildVersionProperties(analysis);
         model.put("properties", properties);
 
-        // Dependency management
+        // Gestion des dépendances
         List<Map<String, String>> depMgmt = buildDependencyManagement(analysis);
         model.put("dependencyManagement", depMgmt);
 
-        // Internal repository if configured
+        // Repository interne si configuré
         if (config.internalRepoUrl() != null) {
             model.put("internalRepository", config.internalRepoUrl());
         }
 
-        // PIC profile if project has build.pic.xml
+        // Profil PIC si le projet a un build.pic.xml
         model.put("hasPicProfile", project.picBuild() != null);
 
         Path pomFile = outputDir.resolve("pom.xml");

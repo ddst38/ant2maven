@@ -13,7 +13,7 @@ import java.nio.file.Path;
 import java.util.Map;
 
 /**
- * FreeMarker template rendering service.
+ * Service de rendu de templates FreeMarker.
  */
 public class TemplateService {
 
@@ -32,7 +32,7 @@ public class TemplateService {
     }
 
     /**
-     * Renders a template with the given data model.
+     * Effectue le rendu d'un template avec le modèle de données donné.
      */
     public String render(String templateName, Map<String, Object> model) {
         try {
@@ -46,7 +46,7 @@ public class TemplateService {
     }
 
     /**
-     * Renders a template and writes it to a file.
+     * Effectue le rendu d'un template et l'écrit dans un fichier.
      */
     public void renderToFile(String templateName, Map<String, Object> model, Path outputFile) {
         try {
