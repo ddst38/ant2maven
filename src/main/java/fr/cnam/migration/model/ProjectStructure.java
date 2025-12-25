@@ -5,7 +5,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Complete structure of a scanned Ant project.
+ * Structure complète d'un projet Ant scanné.
  */
 public record ProjectStructure(
     String name,
@@ -20,7 +20,7 @@ public record ProjectStructure(
     EarConfiguration earConfig
 ) {
     /**
-     * Returns all JARs from all categories.
+     * Retourne tous les JARs de toutes les catégories.
      */
     public List<JarInfo> allJars() {
         List<JarInfo> all = new ArrayList<>();
@@ -31,7 +31,7 @@ public record ProjectStructure(
     }
 
     /**
-     * Returns the primary build info (non-pic).
+     * Retourne les informations de build principal (non-pic).
      */
     public AntBuildInfo primaryBuild() {
         return builds.stream()
@@ -41,7 +41,7 @@ public record ProjectStructure(
     }
 
     /**
-     * Returns the pic build info if available.
+     * Retourne les informations de build pic si disponibles.
      */
     public AntBuildInfo picBuild() {
         return builds.stream()
@@ -51,7 +51,7 @@ public record ProjectStructure(
     }
 
     /**
-     * Source code layout information.
+     * Informations sur la structure du code source.
      */
     public record SourceLayout(
         Path mainJavaDir,

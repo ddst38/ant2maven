@@ -16,8 +16,8 @@ import java.util.List;
 import java.util.stream.Stream;
 
 /**
- * Main scanner that orchestrates project structure analysis.
- * Generic implementation that detects project structure dynamically.
+ * Scanner principal qui orchestre l'analyse de la structure du projet.
+ * Implémentation générique qui détecte la structure du projet dynamiquement.
  */
 public class ProjectScanner {
 
@@ -34,20 +34,20 @@ public class ProjectScanner {
     }
 
     /**
-     * Scans the project and returns its complete structure.
+     * Scanne le projet et retourne sa structure complète.
      */
     public ProjectStructure scan(MigrationConfig config) throws IOException {
         Path projectRoot = config.projectRoot();
         log.info("Scanning project at: {}", projectRoot);
 
-        // Detect project type
+        // Détecter le type de projet
         ProjectType type = detectProjectType(projectRoot);
         log.info("Detected project type: {}", type);
 
-        // Get project name from directory
+        // Obtenir le nom du projet depuis le répertoire
         String projectName = projectRoot.getFileName().toString();
 
-        // Find all JARs and categorize them
+        // Trouver tous les JARs et les catégoriser
         List<JarInfo> allJars = jarScanner.findAllJars(projectRoot);
         List<JarInfo> mainLibs = new ArrayList<>();
         List<JarInfo> testLibs = new ArrayList<>();
@@ -55,7 +55,7 @@ public class ProjectScanner {
 
         for (JarInfo jar : allJars) {
             if (jar.isSourceJar()) {
-                continue; // Skip source JARs
+                continue; // Ignorer les JARs sources
             }
 
             JarInfo.JarCategory category = jarScanner.categorizeByPath(jar.path(), projectRoot);
@@ -71,18 +71,18 @@ public class ProjectScanner {
         log.info("Categorized JARs: {} main, {} test, {} provided",
             mainLibs.size(), testLibs.size(), providedLibs.size());
 
-        // Parse Ant build files
+        // Parser les fichiers de build Ant
         List<AntBuildInfo> builds = antParser.parseAll(projectRoot);
         log.info("Found {} Ant build files", builds.size());
 
-        // Parse properties.conf for internal dependencies
+        // Parser properties.conf pour les dépendances internes
         Path propsConf = projectRoot.resolve("install/properties.conf");
         List<InternalDependency> internalDeps = propsParser.parse(propsConf);
 
-        // Analyze source layout
+        // Analyser la structure des sources
         ProjectStructure.SourceLayout sourceLayout = analyzeSourceLayout(projectRoot, type);
 
-        // Extract EAR configuration
+        // Extraire la configuration EAR
         EarConfiguration earConfig = extractEarConfig(projectRoot, type);
 
         return ProjectStructure.builder()
@@ -100,12 +100,12 @@ public class ProjectScanner {
     }
 
     /**
-     * Detects the project type based on directory structure.
-     * Generic detection without hardcoded project names.
+     * Détecte le type de projet basé sur la structure des répertoires.
+     * Détection générique sans noms de projets codés en dur.
      */
     private ProjectType detectProjectType(Path projectRoot) {
         try (Stream<Path> dirs = Files.list(projectRoot)) {
-            // Look for Maven-style: any directory ending with -app that has src/main/java
+            // Chercher style Maven : tout répertoire finissant par -app qui a src/main/java
             boolean hasMavenStyle = dirs
                 .filter(Files::isDirectory)
                 .filter(p -> p.getFileName().toString().endsWith("-app"))

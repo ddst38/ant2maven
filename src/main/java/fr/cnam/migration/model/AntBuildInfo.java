@@ -5,7 +5,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Information extracted from an Ant build.xml file.
+ * Informations extraites d'un fichier Ant build.xml.
  */
 public record AntBuildInfo(
     Path buildFile,
@@ -21,7 +21,7 @@ public record AntBuildInfo(
     List<String> excludedFiles,
     String webappDir,
     String earConfDir,
-    boolean isPicBuild  // true if this is a build.pic.xml
+    boolean isPicBuild  // true si c'est un build.pic.xml
 ) {
     public static Builder builder() {
         return new Builder();

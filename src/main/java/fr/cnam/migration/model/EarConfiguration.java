@@ -4,7 +4,7 @@ import java.nio.file.Path;
 import java.util.List;
 
 /**
- * EAR packaging configuration extracted from the source project.
+ * Configuration de packaging EAR extraite du projet source.
  */
 public record EarConfiguration(
     String displayName,
@@ -14,7 +14,7 @@ public record EarConfiguration(
     Path weblogicApplicationXml,
     List<Path> appInfLibJars,
     List<Path> appInfConfFiles,
-    String sharedLibraryName,  // e.g., "GMIC_W" or "R0_W"
+    String sharedLibraryName,  // ex: "GMIC_W" ou "R0_W"
     List<String> preferApplicationPackages
 ) {
     public static Builder builder() {

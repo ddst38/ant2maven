@@ -5,14 +5,14 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
- * Result of dependency analysis.
+ * Résultat de l'analyse des dépendances.
  */
 public record AnalysisResult(
     List<DependencyInfo> resolved,
     List<UnresolvedJar> unresolved
 ) {
     /**
-     * Groups resolved dependencies by scope.
+     * Groupe les dépendances résolues par scope.
      */
     public Map<Scope, List<DependencyInfo>> byScope() {
         return resolved.stream()
@@ -20,7 +20,7 @@ public record AnalysisResult(
     }
 
     /**
-     * Groups resolved dependencies by resolution method.
+     * Groupe les dépendances résolues par méthode de résolution.
      */
     public Map<ResolutionMethod, List<DependencyInfo>> byMethod() {
         return resolved.stream()
@@ -28,7 +28,7 @@ public record AnalysisResult(
     }
 
     /**
-     * Returns all internal (proprietary) dependencies.
+     * Retourne toutes les dépendances internes (propriétaires).
      */
     public List<DependencyInfo> internalDependencies() {
         return resolved.stream()
@@ -37,7 +37,7 @@ public record AnalysisResult(
     }
 
     /**
-     * Returns all external (Maven Central) dependencies.
+     * Retourne toutes les dépendances externes (Maven Central).
      */
     public List<DependencyInfo> externalDependencies() {
         return resolved.stream()
@@ -46,7 +46,7 @@ public record AnalysisResult(
     }
 
     /**
-     * Resolution success rate as a percentage.
+     * Taux de succès de résolution en pourcentage.
      */
     public double successRate() {
         int total = resolved.size() + unresolved.size();
@@ -54,7 +54,7 @@ public record AnalysisResult(
     }
 
     /**
-     * An unresolved JAR with attempted resolution methods.
+     * Un JAR non résolu avec les méthodes de résolution tentées.
      */
     public record UnresolvedJar(
         JarInfo jar,
@@ -62,7 +62,7 @@ public record AnalysisResult(
     ) {}
 
     /**
-     * A single resolution attempt.
+     * Une tentative de résolution unique.
      */
     public record ResolutionAttempt(
         ResolutionMethod method,
@@ -71,7 +71,7 @@ public record AnalysisResult(
         MavenCoordinate coordinate
     ) {
         public static ResolutionAttempt success(ResolutionMethod method, MavenCoordinate coordinate) {
-            return new ResolutionAttempt(method, true, "Found", coordinate);
+            return new ResolutionAttempt(method, true, "Trouvé", coordinate);
         }
 
         public static ResolutionAttempt failed(ResolutionMethod method, String reason) {

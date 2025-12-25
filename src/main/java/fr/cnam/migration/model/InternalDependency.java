@@ -4,21 +4,21 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * An internal dependency from properties.conf [DEPENDANCES_FAB] section.
- * Generic implementation that extracts project code dynamically.
- * Example: S8071302J;BASE_S8 or MYPROJ010000W;BASE_MYPROJ
+ * Une dépendance interne depuis la section [DEPENDANCES_FAB] du properties.conf.
+ * Implémentation générique qui extrait le code projet dynamiquement.
+ * Exemple : S8071302J;BASE_S8 ou MYPROJ010000W;BASE_MYPROJ
  */
 public record InternalDependency(
-    String code,           // e.g., "S8071302J", "MYPROJ010000W"
-    String envVariable,    // e.g., "BASE_S8", "BASE_MYPROJ"
-    String projectCode,    // e.g., "S8", "MYPROJ" (extracted dynamically)
-    String description     // Derived description
+    String code,           // ex: "S8071302J", "MYPROJ010000W"
+    String envVariable,    // ex: "BASE_S8", "BASE_MYPROJ"
+    String projectCode,    // ex: "S8", "MYPROJ" (extrait dynamiquement)
+    String description     // Description dérivée
 ) {
-    // Pattern to extract project code: letters at the start, followed by digits, then optional suffix
-    // Examples: S8071302J -> S8, GMIC021104WS -> GMIC, MYPROJ010000W -> MYPROJ
+    // Pattern pour extraire le code projet : lettres au début, suivies de chiffres, puis suffixe optionnel
+    // Exemples : S8071302J -> S8, GMIC021104WS -> GMIC, MYPROJ010000W -> MYPROJ
     private static final Pattern CODE_PATTERN = Pattern.compile("^([A-Z]+\\d?)\\d{6,}.*$");
 
-    // Alternative pattern for shorter codes
+    // Pattern alternatif pour les codes plus courts
     private static final Pattern SHORT_CODE_PATTERN = Pattern.compile("^([A-Z]{2,})\\d+.*$");
 
     public static InternalDependency parse(String line) {
@@ -34,28 +34,28 @@ public record InternalDependency(
     }
 
     /**
-     * Extracts project code dynamically from the dependency code or environment variable.
-     * Uses multiple strategies to find the project code.
+     * Extrait le code projet dynamiquement depuis le code de dépendance ou la variable d'environnement.
+     * Utilise plusieurs stratégies pour trouver le code projet.
      */
     private static String extractProjectCode(String code, String envVar) {
-        // Strategy 1: Extract from BASE_XXX environment variable
+        // Stratégie 1 : Extraire depuis la variable d'environnement BASE_XXX
         if (envVar != null && envVar.startsWith("BASE_")) {
-            return envVar.substring(5); // Remove "BASE_" prefix
+            return envVar.substring(5); // Supprimer le préfixe "BASE_"
         }
 
-        // Strategy 2: Use regex to extract from code
+        // Stratégie 2 : Utiliser une regex pour extraire depuis le code
         Matcher matcher = CODE_PATTERN.matcher(code);
         if (matcher.matches()) {
             return matcher.group(1);
         }
 
-        // Strategy 3: Try shorter pattern
+        // Stratégie 3 : Essayer un pattern plus court
         matcher = SHORT_CODE_PATTERN.matcher(code);
         if (matcher.matches()) {
             return matcher.group(1);
         }
 
-        // Strategy 4: Take first letters until we hit a digit
+        // Stratégie 4 : Prendre les premières lettres jusqu'au premier chiffre
         StringBuilder sb = new StringBuilder();
         for (char c : code.toCharArray()) {
             if (Character.isLetter(c)) {
@@ -69,19 +69,19 @@ public record InternalDependency(
             return sb.toString();
         }
 
-        // Fallback: use first 4 characters or full code if shorter
+        // Fallback : utiliser les 4 premiers caractères ou le code complet si plus court
         return code.substring(0, Math.min(4, code.length()));
     }
 
     /**
-     * Returns the expected library path variable used in depend.xml.
-     * Derives it from the environment variable or project code.
+     * Retourne la variable de chemin de bibliothèque attendue utilisée dans depend.xml.
+     * La dérive depuis la variable d'environnement ou le code projet.
      */
     public String getLibPathVariable() {
-        // If env variable is BASE_XXX, the lib path is likely XXXJ.lib or XXX.lib
+        // Si la variable env est BASE_XXX, le chemin lib est probablement XXXJ.lib ou XXX.lib
         if (envVariable != null && envVariable.startsWith("BASE_")) {
             String base = envVariable.substring(5);
-            // Common patterns: BASE_S8 -> S8J.lib, BASE_WS -> WS.lib
+            // Patterns courants : BASE_S8 -> S8J.lib, BASE_WS -> WS.lib
             if (code.endsWith("J") || code.contains("_J")) {
                 return base + "J.lib";
             } else if (code.endsWith("WS") || code.contains("WS")) {
@@ -97,16 +97,16 @@ public record InternalDependency(
     }
 
     /**
-     * Convert to a Maven coordinate for the internal repository.
-     * Uses the default base package (fr.cnamts).
+     * Convertit en coordonnées Maven pour le repository interne.
+     * Utilise le package de base par défaut (fr.cnamts).
      */
     public MavenCoordinate toMavenCoordinate() {
         return toMavenCoordinate("fr.cnamts");
     }
 
     /**
-     * Convert to a Maven coordinate for the internal repository.
-     * @param basePackage The base package to use (e.g., "fr.cnamts" or "fr.cnam")
+     * Convertit en coordonnées Maven pour le repository interne.
+     * @param basePackage Le package de base à utiliser (ex: "fr.cnamts" ou "fr.cnam")
      */
     public MavenCoordinate toMavenCoordinate(String basePackage) {
         String groupId = basePackage + "." + projectCode.toLowerCase();

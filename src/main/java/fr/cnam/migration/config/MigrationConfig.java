@@ -3,7 +3,7 @@ package fr.cnam.migration.config;
 import java.nio.file.Path;
 
 /**
- * Global configuration for the migration process.
+ * Configuration globale pour le processus de migration.
  */
 public record MigrationConfig(
     Path projectRoot,
@@ -11,31 +11,31 @@ public record MigrationConfig(
     Path knownArtifactsFile,
     String internalRepoUrl,
     boolean dryRun,
-    String buildVariant,  // "default" or "pic"
+    String buildVariant,  // "default" ou "pic"
     boolean skipMavenCentralLookup,
     boolean verbose,
-    String basePackage,    // Base package for internal artifacts (fr.cnamts or fr.cnam)
-    // Artifactory configuration
-    String artifactoryUrl,           // Base URL of Artifactory server
-    Path artifactoryCertPath,        // Path to .crt certificate file for SSL
-    String artifactoryReleaseRepo,   // Repository for release artifacts
-    String artifactorySnapshotRepo,  // Repository for snapshot artifacts
-    String artifactoryUsername,      // Username for Artifactory authentication
-    String artifactoryPassword,      // Password/token for Artifactory authentication
-    DeploymentMode deploymentMode    // LOCAL or REMOTE deployment
+    String basePackage,    // Package de base pour les artefacts internes (fr.cnamts ou fr.cnam)
+    // Configuration Artifactory
+    String artifactoryUrl,           // URL de base du serveur Artifactory
+    Path artifactoryCertPath,        // Chemin vers le fichier certificat .crt pour SSL
+    String artifactoryReleaseRepo,   // Repository pour les artefacts release
+    String artifactorySnapshotRepo,  // Repository pour les artefacts snapshot
+    String artifactoryUsername,      // Nom d'utilisateur pour l'authentification Artifactory
+    String artifactoryPassword,      // Mot de passe/token pour l'authentification Artifactory
+    DeploymentMode deploymentMode    // Déploiement LOCAL ou REMOTE
 ) {
     /**
-     * Default base package for internal artifacts.
+     * Package de base par défaut pour les artefacts internes.
      */
     public static final String DEFAULT_BASE_PACKAGE = "fr.cnamts";
 
     /**
-     * Deployment mode for unresolved artifacts.
+     * Mode de déploiement pour les artefacts non résolus.
      */
     public enum DeploymentMode {
-        /** Install artifacts to local .m2 repository */
+        /** Installe les artefacts dans le repository local .m2 */
         LOCAL,
-        /** Upload artifacts to Artifactory */
+        /** Upload les artefacts vers Artifactory */
         REMOTE
     }
 
@@ -48,14 +48,14 @@ public record MigrationConfig(
     }
 
     /**
-     * Returns true if Artifactory is configured and can be used for lookups.
+     * Retourne true si Artifactory est configuré et peut être utilisé pour les recherches.
      */
     public boolean isArtifactoryConfigured() {
         return artifactoryUrl != null && !artifactoryUrl.isBlank();
     }
 
     /**
-     * Returns true if deployment to Artifactory is enabled.
+     * Retourne true si le déploiement vers Artifactory est activé.
      */
     public boolean isRemoteDeployment() {
         return deploymentMode == DeploymentMode.REMOTE && isArtifactoryConfigured();
@@ -71,7 +71,7 @@ public record MigrationConfig(
         private boolean skipMavenCentralLookup;
         private boolean verbose;
         private String basePackage = DEFAULT_BASE_PACKAGE;
-        // Artifactory settings
+        // Paramètres Artifactory
         private String artifactoryUrl;
         private Path artifactoryCertPath;
         private String artifactoryReleaseRepo = "libs-release-local";

@@ -3,7 +3,7 @@ package fr.cnam.migration.model;
 import java.util.Objects;
 
 /**
- * Maven GAV (GroupId, ArtifactId, Version) coordinate with optional classifier.
+ * Coordonnées Maven GAV (GroupId, ArtifactId, Version) avec classifier optionnel.
  */
 public record MavenCoordinate(
     String groupId,
@@ -27,7 +27,7 @@ public record MavenCoordinate(
     }
 
     /**
-     * Returns the GAV string representation (groupId:artifactId:version).
+     * Retourne la représentation GAV sous forme de chaîne (groupId:artifactId:version).
      */
     public String toGav() {
         StringBuilder sb = new StringBuilder();
@@ -39,7 +39,7 @@ public record MavenCoordinate(
     }
 
     /**
-     * Returns the path in a Maven repository.
+     * Retourne le chemin dans un repository Maven.
      */
     public String toRepositoryPath() {
         StringBuilder sb = new StringBuilder();
@@ -60,7 +60,7 @@ public record MavenCoordinate(
     }
 
     /**
-     * Returns a property-safe version name for use in pom.xml properties.
+     * Retourne un nom de propriété sécurisé pour utilisation dans les propriétés du pom.xml.
      */
     public String toPropertyName() {
         return artifactId.replace("-", ".") + ".version";

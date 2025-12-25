@@ -1,7 +1,7 @@
 package fr.cnam.migration.model;
 
 /**
- * A resolved dependency with its Maven coordinates, scope, and resolution metadata.
+ * Une dépendance résolue avec ses coordonnées Maven, son scope et ses métadonnées de résolution.
  */
 public record DependencyInfo(
     MavenCoordinate coordinate,
@@ -27,7 +27,7 @@ public record DependencyInfo(
     }
 
     /**
-     * Creates a version property reference like ${spring.version}.
+     * Crée une référence de propriété de version comme ${spring.version}.
      */
     public String versionProperty() {
         return "${" + coordinate.toPropertyName() + "}";

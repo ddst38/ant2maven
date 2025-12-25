@@ -1,48 +1,48 @@
 package fr.cnam.migration.model;
 
 /**
- * How a JAR was resolved to Maven coordinates.
+ * Comment un JAR a été résolu en coordonnées Maven.
  */
 public enum ResolutionMethod {
     /**
-     * JAR was identified as an internal/proprietary artifact.
+     * JAR identifié comme un artefact interne/propriétaire.
      */
-    INTERNAL_PATTERN("Internal artifact pattern"),
+    INTERNAL_PATTERN("Pattern d'artefact interne"),
 
     /**
-     * JAR was found in the known-artifacts configuration.
+     * JAR trouvé dans la configuration des artefacts connus.
      */
-    KNOWN_CONFIG("Known artifacts configuration"),
+    KNOWN_CONFIG("Configuration des artefacts connus"),
 
     /**
-     * JAR was found on Artifactory by SHA1 checksum.
+     * JAR trouvé sur Artifactory par checksum SHA1.
      */
-    ARTIFACTORY_CHECKSUM("Artifactory SHA1 checksum lookup"),
+    ARTIFACTORY_CHECKSUM("Recherche SHA1 sur Artifactory"),
 
     /**
-     * JAR exists on Artifactory (verified by coordinates).
+     * JAR existe sur Artifactory (vérifié par coordonnées).
      */
-    ARTIFACTORY("Artifactory lookup"),
+    ARTIFACTORY("Recherche Artifactory"),
 
     /**
-     * JAR was found on Maven Central by SHA1 checksum.
+     * JAR trouvé sur Maven Central par checksum SHA1.
      */
-    CHECKSUM("Maven Central SHA1 checksum lookup"),
+    CHECKSUM("Recherche SHA1 sur Maven Central"),
 
     /**
-     * JAR was identified from MANIFEST.MF metadata.
+     * JAR identifié depuis les métadonnées MANIFEST.MF.
      */
-    MANIFEST("MANIFEST.MF analysis"),
+    MANIFEST("Analyse MANIFEST.MF"),
 
     /**
-     * JAR was identified by filename pattern matching.
+     * JAR identifié par correspondance de pattern sur le nom de fichier.
      */
-    PATTERN("Filename pattern matching"),
+    PATTERN("Correspondance de pattern sur nom de fichier"),
 
     /**
-     * JAR could not be resolved.
+     * JAR non résolu.
      */
-    UNRESOLVED("Unresolved");
+    UNRESOLVED("Non résolu");
 
     private final String description;
 

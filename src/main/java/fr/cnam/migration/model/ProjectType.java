@@ -1,29 +1,29 @@
 package fr.cnam.migration.model;
 
 /**
- * Type of Ant project structure detected.
- * Generic detection based on directory patterns, not specific project names.
+ * Type de structure de projet Ant détecté.
+ * Détection générique basée sur les patterns de répertoires, pas sur les noms de projets spécifiques.
  */
 public enum ProjectType {
     /**
-     * Maven-like structure: *-app/src/main/java, *-app/src/main/webapp
-     * Typical modules: XXX-app, XXXEar
+     * Structure style Maven : *-app/src/main/java, *-app/src/main/webapp
+     * Modules typiques : XXX-app, XXXEar
      */
     MAVEN_STYLE,
 
     /**
-     * Eclipse-like structure: XXX/src, XXX/WebContent
-     * Typical modules: XXX, XXXEar
+     * Structure style Eclipse : XXX/src, XXX/WebContent
+     * Modules typiques : XXX, XXXEar
      */
     ECLIPSE_STYLE;
 
     /**
-     * Returns a description of this project type.
+     * Retourne une description de ce type de projet.
      */
     public String getDescription() {
         return switch (this) {
-            case MAVEN_STYLE -> "Maven-like structure (src/main/java)";
-            case ECLIPSE_STYLE -> "Eclipse-like structure (src, WebContent)";
+            case MAVEN_STYLE -> "Structure style Maven (src/main/java)";
+            case ECLIPSE_STYLE -> "Structure style Eclipse (src, WebContent)";
         };
     }
 }

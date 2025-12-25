@@ -4,7 +4,7 @@ import java.nio.file.Path;
 import java.util.regex.Pattern;
 
 /**
- * Information about a JAR file discovered in the project.
+ * Informations sur un fichier JAR découvert dans le projet.
  */
 public record JarInfo(
     Path path,
@@ -14,14 +14,14 @@ public record JarInfo(
     JarCategory category
 ) {
     public enum JarCategory {
-        MAIN,      // Main compilation dependency
-        TEST,      // Test-only dependency
-        PROVIDED,  // Provided by container (servlet-api, etc.)
-        RUNTIME,   // Runtime only
-        UNKNOWN    // Not yet categorized
+        MAIN,      // Dépendance de compilation principale
+        TEST,      // Dépendance de test uniquement
+        PROVIDED,  // Fourni par le conteneur (servlet-api, etc.)
+        RUNTIME,   // Exécution uniquement
+        UNKNOWN    // Pas encore catégorisé
     }
 
-    // Patterns for internal artifact detection
+    // Patterns pour la détection des artefacts internes
     private static final Pattern DEPFAB_PATTERN = Pattern.compile("^DEPFAB\\..*\\.jar$");
     private static final Pattern PROJECT_CODE_PATTERN = Pattern.compile("^[A-Z]+_[A-Z]\\..*\\.jar$");
     private static final Pattern CNAM_PROJECT_PATTERN = Pattern.compile("^[A-Z]+\\d{6,}.*\\.jar$");
@@ -42,45 +42,45 @@ public record JarInfo(
     }
 
     /**
-     * Checks if this JAR appears to be an internal/proprietary artifact.
-     * Uses generic patterns that work across different CNAM projects.
+     * Vérifie si ce JAR semble être un artefact interne/propriétaire.
+     * Utilise des patterns génériques qui fonctionnent pour différents projets CNAM.
      */
     public boolean isInternalArtifact() {
-        // DEPFAB.* pattern (most common internal pattern)
+        // Pattern DEPFAB.* (pattern interne le plus courant)
         if (DEPFAB_PATTERN.matcher(name).matches()) {
             return true;
         }
 
-        // XXX_Y.something pattern (e.g., S8_J.secJava.jar, BIMC_H.core.jar)
+        // Pattern XXX_Y.something (ex: S8_J.secJava.jar, BIMC_H.core.jar)
         if (PROJECT_CODE_PATTERN.matcher(name).matches()) {
             return true;
         }
 
-        // CNAM project codes (e.g., SOCA010000J-1.0.0.jar)
+        // Codes projets CNAM (ex: SOCA010000J-1.0.0.jar)
         if (CNAM_PROJECT_PATTERN.matcher(name).matches()) {
             return true;
         }
 
-        // Service stubs (e.g., ServicePS_3.0.client.jar)
+        // Stubs de services (ex: ServicePS_3.0.client.jar)
         if (SERVICE_PATTERN.matcher(name).matches()) {
             return true;
         }
 
-        // jk-socle libraries
+        // Bibliothèques jk-socle
         if (JK_SOCLE_PATTERN.matcher(name).matches()) {
             return true;
         }
 
-        // s8 libraries (e.g., s8sp-2.0.3.jar, s8h-chiffrementUtil-1.2.0.jar)
+        // Bibliothèques s8 (ex: s8sp-2.0.3.jar, s8h-chiffrementUtil-1.2.0.jar)
         if (S8_PATTERN.matcher(name).matches()) {
             return true;
         }
 
-        // Specific well-known internal JARs (keep for backwards compatibility)
-        // These are in known-artifacts.yaml but we also check here
+        // JARs internes spécifiques bien connus (conservés pour compatibilité)
+        // Ceux-ci sont dans known-artifacts.yaml mais on les vérifie aussi ici
         return name.equals("tracesCaster.jar") ||
                name.equals("biblicnam.jar") ||
                name.equals("archirfe.jar") ||
-               name.equals("classes12.jar");  // Oracle JDBC not on Maven Central
+               name.equals("classes12.jar");  // Oracle JDBC non disponible sur Maven Central
     }
 }

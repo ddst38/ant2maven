@@ -1,7 +1,7 @@
 package fr.cnam.migration.model;
 
 /**
- * Maven dependency scope.
+ * Scope de dépendance Maven.
  */
 public enum Scope {
     COMPILE("compile"),

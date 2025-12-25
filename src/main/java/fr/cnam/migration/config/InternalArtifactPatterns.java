@@ -10,9 +10,9 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Patterns for recognizing and converting internal/proprietary JARs.
- * Uses generic patterns that work across different CNAM projects.
- * The base package (fr.cnamts or fr.cnam) is configurable.
+ * Patterns pour reconnaître et convertir les JARs internes/propriétaires.
+ * Utilise des patterns génériques qui fonctionnent pour différents projets CNAM.
+ * Le package de base (fr.cnamts ou fr.cnam) est configurable.
  */
 public class InternalArtifactPatterns {
 
@@ -30,7 +30,7 @@ public class InternalArtifactPatterns {
 
     private void initializePatterns() {
         // DEPFAB.XXX_Y.module.jar -> {basePackage}.internal.xxx.y:module:LOCAL
-        // Examples: DEPFAB.S8_J.secJava.jar, DEPFAB.BIMC_H.core.jar
+        // Exemples : DEPFAB.S8_J.secJava.jar, DEPFAB.BIMC_H.core.jar
         patterns.add(new InternalPattern(
             Pattern.compile("^DEPFAB\\.([A-Z0-9]+_[A-Z])\\.(.+)\\.jar$"),
             (m, jar) -> new MavenCoordinate(
@@ -41,7 +41,7 @@ public class InternalArtifactPatterns {
         ));
 
         // DEPFAB.XXX_Y-version-suffix.jar -> {basePackage}.internal:xxx_y:version
-        // Example: DEPFAB.BIMC_H-1.0.16-st3.0-rhel7-wls12cr2-pub.jar
+        // Exemple : DEPFAB.BIMC_H-1.0.16-st3.0-rhel7-wls12cr2-pub.jar
         patterns.add(new InternalPattern(
             Pattern.compile("^DEPFAB\\.([A-Z0-9]+_[A-Z])-(\\d+\\.\\d+\\.\\d+)-.+\\.jar$"),
             (m, jar) -> new MavenCoordinate(
@@ -52,7 +52,7 @@ public class InternalArtifactPatterns {
         ));
 
         // DEPFAB.XXX_ServiceName_version_type.jar -> {basePackage}.internal:xxx-servicename:version-type
-        // Example: DEPFAB.W1_ServiceImageDecompte_v1.0_client.jar
+        // Exemple : DEPFAB.W1_ServiceImageDecompte_v1.0_client.jar
         patterns.add(new InternalPattern(
             Pattern.compile("^DEPFAB\\.([A-Z0-9]+)_([A-Za-z]+)_v?(\\d+\\.\\d+)_([a-z]+)\\.jar$"),
             (m, jar) -> new MavenCoordinate(
@@ -63,7 +63,7 @@ public class InternalArtifactPatterns {
         ));
 
         // DEPFAB.XXX_WS.XXX_ServiceName.type.jar -> {basePackage}.internal:xxx-servicename:type
-        // Example: DEPFAB.GMIC_WS.GMIC_ServiceGMIC.serveur.jar
+        // Exemple : DEPFAB.GMIC_WS.GMIC_ServiceGMIC.serveur.jar
         patterns.add(new InternalPattern(
             Pattern.compile("^DEPFAB\\.([A-Z0-9]+)_WS\\.\\1_([A-Za-z]+)\\.([a-z]+)\\.jar$"),
             (m, jar) -> new MavenCoordinate(
@@ -73,7 +73,7 @@ public class InternalArtifactPatterns {
             )
         ));
 
-        // Generic DEPFAB pattern: DEPFAB.anything.jar
+        // Pattern DEPFAB générique : DEPFAB.anything.jar
         patterns.add(new InternalPattern(
             Pattern.compile("^DEPFAB\\.(.+)\\.jar$"),
             (m, jar) -> new MavenCoordinate(
@@ -94,7 +94,7 @@ public class InternalArtifactPatterns {
         ));
 
         // XXX_Y.library-version.jar -> {basePackage}.xxx:library:version
-        // Example: S8_J.commons-collections4-4.1.jar
+        // Exemple : S8_J.commons-collections4-4.1.jar
         patterns.add(new InternalPattern(
             Pattern.compile("^([A-Z0-9]+_[A-Z])\\.(.+)-(\\d+\\.\\d+(?:\\.\\d+)?)\\.jar$"),
             (m, jar) -> new MavenCoordinate(
@@ -115,7 +115,7 @@ public class InternalArtifactPatterns {
         ));
 
         // ServiceXXX_version.type.jar -> {basePackage}.services:servicexxx:version-type
-        // Example: ServicePS_3.0.client.jar
+        // Exemple : ServicePS_3.0.client.jar
         patterns.add(new InternalPattern(
             Pattern.compile("^(Service[A-Z]+)_(\\d+\\.\\d+)\\.([a-z]+)\\.jar$"),
             (m, jar) -> new MavenCoordinate(
@@ -125,8 +125,8 @@ public class InternalArtifactPatterns {
             )
         ));
 
-        // SOCA or similar project codes: XXXNNNNNNNY-version-suffix.jar
-        // Example: SOCA010000J-1.0.0-multipub-pub.jar
+        // Codes projet SOCA ou similaires : XXXNNNNNNNY-version-suffix.jar
+        // Exemple : SOCA010000J-1.0.0-multipub-pub.jar
         patterns.add(new InternalPattern(
             Pattern.compile("^([A-Z]+\\d+[A-Z])-(\\d+\\.\\d+\\.\\d+)-.+\\.jar$"),
             (m, jar) -> new MavenCoordinate(
@@ -136,7 +136,7 @@ public class InternalArtifactPatterns {
             )
         ));
 
-        // tracesCaster.jar and similar standalone JARs
+        // tracesCaster.jar et JARs autonomes similaires
         patterns.add(new InternalPattern(
             Pattern.compile("^(tracesCaster)\\.jar$"),
             (m, jar) -> new MavenCoordinate(
@@ -146,12 +146,12 @@ public class InternalArtifactPatterns {
             )
         ));
 
-        // Generic internal JARs without version (biblicnam.jar, archirfe.jar, etc.)
+        // JARs internes génériques sans version (biblicnam.jar, archirfe.jar, etc.)
         patterns.add(new InternalPattern(
             Pattern.compile("^([a-z][a-z0-9]+)\\.jar$"),
             (m, jar) -> {
                 String name = m.group(1);
-                // Only match if it looks like an internal artifact (short name, no version)
+                // Ne matcher que si ça ressemble à un artefact interne (nom court, pas de version)
                 if (name.length() <= 15 && !name.contains("-")) {
                     return new MavenCoordinate(
                         basePackage + ".internal",
@@ -163,7 +163,7 @@ public class InternalArtifactPatterns {
             }
         ));
 
-        // Oracle JDBC classes12.jar
+        // Oracle JDBC classes12.jar (pilote Oracle)
         patterns.add(new InternalPattern(
             Pattern.compile("^classes12\\.jar$"),
             (m, jar) -> new MavenCoordinate(
@@ -173,7 +173,7 @@ public class InternalArtifactPatterns {
             )
         ));
 
-        // Legacy struts.jar
+        // struts.jar historique
         patterns.add(new InternalPattern(
             Pattern.compile("^struts\\.jar$"),
             (m, jar) -> new MavenCoordinate(
@@ -185,17 +185,17 @@ public class InternalArtifactPatterns {
     }
 
     /**
-     * Returns the configured base package.
+     * Retourne le package de base configuré.
      */
     public String getBasePackage() {
         return basePackage;
     }
 
     /**
-     * Checks if a JAR name matches any internal pattern.
+     * Vérifie si un nom de JAR correspond à un pattern interne.
      */
     public boolean isInternal(String jarName) {
-        // Common internal prefixes
+        // Préfixes internes courants
         if (jarName.startsWith("DEPFAB.") ||
             jarName.startsWith("jk-socle-") ||
             jarName.matches("^[A-Z]+_[A-Z]\\..*") ||  // XXX_Y.something
@@ -205,7 +205,7 @@ public class InternalArtifactPatterns {
             return true;
         }
 
-        // Check specific patterns
+        // Vérifier les patterns spécifiques
         for (InternalPattern pattern : patterns) {
             if (pattern.pattern.matcher(jarName).matches()) {
                 return true;
@@ -216,7 +216,7 @@ public class InternalArtifactPatterns {
     }
 
     /**
-     * Attempts to resolve a JAR to Maven coordinates using internal patterns.
+     * Tente de résoudre un JAR en coordonnées Maven en utilisant les patterns internes.
      */
     public Optional<MavenCoordinate> resolve(JarInfo jar) {
         for (InternalPattern pattern : patterns) {
@@ -228,7 +228,7 @@ public class InternalArtifactPatterns {
                         return Optional.of(coord);
                     }
                 } catch (Exception e) {
-                    // Continue to next pattern
+                    // Continuer vers le pattern suivant
                 }
             }
         }

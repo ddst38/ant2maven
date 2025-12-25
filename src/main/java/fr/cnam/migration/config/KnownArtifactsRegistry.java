@@ -15,8 +15,8 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * Registry of known JAR to Maven coordinate mappings.
- * Loads from embedded known-artifacts.yaml and optionally from external file.
+ * Registre des mappings JAR vers coordonnées Maven connus.
+ * Charge depuis known-artifacts.yaml embarqué et optionnellement depuis un fichier externe.
  */
 public class KnownArtifactsRegistry {
 
@@ -80,20 +80,20 @@ public class KnownArtifactsRegistry {
     }
 
     /**
-     * Looks up a JAR name in the registry.
+     * Recherche un nom de JAR dans le registre.
      */
     public Optional<MavenCoordinate> lookup(String jarName) {
         return Optional.ofNullable(artifacts.get(jarName));
     }
 
     /**
-     * Returns the number of known artifacts.
+     * Retourne le nombre d'artefacts connus.
      */
     public int size() {
         return artifacts.size();
     }
 
-    // Internal DTOs for YAML parsing
+    // DTOs internes pour le parsing YAML
     record KnownArtifactsConfig(Map<String, ArtifactMapping> knownArtifacts) {}
 
     record ArtifactMapping(
