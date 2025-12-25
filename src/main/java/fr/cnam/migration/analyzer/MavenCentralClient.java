@@ -16,7 +16,7 @@ import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Client for querying Maven Central repository.
+ * Client pour interroger le repository Maven Central.
  */
 public class MavenCentralClient {
 
@@ -39,7 +39,7 @@ public class MavenCentralClient {
     }
 
     /**
-     * Searches Maven Central for an artifact by SHA1 checksum.
+     * Recherche sur Maven Central un artefact par checksum SHA1.
      */
     public Optional<MavenCoordinate> searchBySha1(String sha1) {
         if (sha1 == null || sha1.isEmpty()) {
@@ -107,7 +107,7 @@ public class MavenCentralClient {
     }
 
     /**
-     * Checks if an artifact exists on Maven Central.
+     * Vérifie si un artefact existe sur Maven Central.
      */
     public boolean exists(MavenCoordinate coord) {
         if (coord == null) {
@@ -149,7 +149,7 @@ public class MavenCentralClient {
     }
 
     /**
-     * Searches Maven Central by artifact name (less reliable than SHA1).
+     * Recherche sur Maven Central par nom d'artefact (moins fiable que SHA1).
      */
     public Optional<MavenCoordinate> searchByName(String artifactId, String version) {
         try {
@@ -176,7 +176,7 @@ public class MavenCentralClient {
     }
 
     /**
-     * Returns cache statistics.
+     * Retourne les statistiques du cache.
      */
     public String getCacheStats() {
         return String.format("SHA1 cache: %d entries, Exists cache: %d entries",

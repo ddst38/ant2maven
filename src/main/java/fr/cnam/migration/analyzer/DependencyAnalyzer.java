@@ -11,14 +11,14 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 /**
- * Analyzes project dependencies and resolves them to Maven coordinates.
+ * Analyse les dépendances du projet et les résout en coordonnées Maven.
  *
- * Resolution pipeline (in order):
- * 1. Internal artifact patterns (DEPFAB.*, jk-socle-*, etc.)
- * 2. Known artifacts configuration
- * 3. Artifactory lookup by SHA1 (if configured)
- * 4. Maven Central lookup by SHA1
- * 5. Filename pattern matching with verification
+ * Pipeline de résolution (dans l'ordre) :
+ * 1. Patterns d'artefacts internes (DEPFAB.*, jk-socle-*, etc.)
+ * 2. Configuration des artefacts connus
+ * 3. Recherche Artifactory par SHA1 (si configuré)
+ * 4. Recherche Maven Central par SHA1
+ * 5. Correspondance de pattern sur nom de fichier avec vérification
  */
 public class DependencyAnalyzer {
 
@@ -41,7 +41,7 @@ public class DependencyAnalyzer {
         this.patternMatcher = new JarNamePatternMatcher();
         this.versionExtractor = new JarVersionExtractor();
 
-        // Test Artifactory connection if configured
+        // Tester la connexion Artifactory si configuré
         if (config.isArtifactoryConfigured()) {
             if (artifactoryClient.testConnection()) {
                 log.info("Artifactory connection successful: {}", config.artifactoryUrl());
@@ -52,7 +52,7 @@ public class DependencyAnalyzer {
     }
 
     /**
-     * Analyzes all JARs in the project structure and resolves them.
+     * Analyse tous les JARs dans la structure du projet et les résout.
      */
     public AnalysisResult analyze(ProjectStructure project) {
         log.info("Analyzing {} JARs for project {}", project.allJars().size(), project.name());
@@ -81,7 +81,7 @@ public class DependencyAnalyzer {
             }
         }
 
-        // Post-process: deduplicate and normalize
+        // Post-traitement : dédupliquer et normaliser
         resolved = deduplicateAndNormalize(resolved);
 
         log.info("Resolution complete: {} resolved, {} unresolved",
@@ -96,12 +96,12 @@ public class DependencyAnalyzer {
     }
 
     /**
-     * Attempts to resolve a single JAR using the resolution pipeline.
+     * Tente de résoudre un seul JAR en utilisant le pipeline de résolution.
      */
     private ResolutionContext resolveJar(JarInfo jar) {
         List<AnalysisResult.ResolutionAttempt> attempts = new ArrayList<>();
 
-        // Strategy 1: Check if it's an internal artifact
+        // Stratégie 1 : Vérifier si c'est un artefact interne
         if (internalPatterns.isInternal(jar.name())) {
             Optional<MavenCoordinate> coord = internalPatterns.resolve(jar);
             if (coord.isPresent()) {
@@ -110,7 +110,7 @@ public class DependencyAnalyzer {
             }
         }
 
-        // Strategy 2: Check known artifacts configuration
+        // Stratégie 2 : Vérifier la configuration des artefacts connus
         Optional<MavenCoordinate> known = knownArtifacts.lookup(jar.name());
         if (known.isPresent()) {
             attempts.add(AnalysisResult.ResolutionAttempt.success(
@@ -121,7 +121,7 @@ public class DependencyAnalyzer {
         attempts.add(AnalysisResult.ResolutionAttempt.failed(
             ResolutionMethod.KNOWN_CONFIG, "Not in known artifacts"));
 
-        // Strategy 3: Artifactory SHA1 checksum lookup (FIRST, before Maven Central)
+        // Stratégie 3 : Recherche Artifactory par SHA1 (EN PREMIER, avant Maven Central)
         if (config.isArtifactoryConfigured() && jar.sha1() != null) {
             Optional<MavenCoordinate> fromArtifactory = artifactoryClient.searchBySha1(jar.sha1());
             if (fromArtifactory.isPresent()) {
@@ -134,7 +134,7 @@ public class DependencyAnalyzer {
                 ResolutionMethod.ARTIFACTORY_CHECKSUM, "Not found on Artifactory"));
         }
 
-        // Strategy 4: Maven Central SHA1 checksum lookup
+        // Stratégie 4 : Recherche Maven Central par SHA1
         if (!config.skipMavenCentralLookup() && jar.sha1() != null) {
             Optional<MavenCoordinate> bySha1 = mavenCentral.searchBySha1(jar.sha1());
             if (bySha1.isPresent()) {
@@ -147,12 +147,12 @@ public class DependencyAnalyzer {
                 ResolutionMethod.CHECKSUM, "Not found on Maven Central"));
         }
 
-        // Strategy 5: Filename pattern matching with Artifactory/Maven Central verification
+        // Stratégie 5 : Correspondance de pattern sur nom de fichier avec vérification Artifactory/Maven Central
         Optional<MavenCoordinate> fromPattern = patternMatcher.match(jar.name());
         if (fromPattern.isPresent()) {
             MavenCoordinate coord = fromPattern.get();
 
-            // First check Artifactory
+            // D'abord vérifier sur Artifactory
             if (config.isArtifactoryConfigured() && artifactoryClient.exists(coord)) {
                 attempts.add(AnalysisResult.ResolutionAttempt.success(
                     ResolutionMethod.ARTIFACTORY, coord));
@@ -160,7 +160,7 @@ public class DependencyAnalyzer {
                 return ResolutionContext.resolved(coord, ResolutionMethod.ARTIFACTORY, attempts);
             }
 
-            // Then check Maven Central
+            // Ensuite vérifier sur Maven Central
             boolean existsOnCentral = config.skipMavenCentralLookup() || mavenCentral.exists(coord);
             if (existsOnCentral) {
                 attempts.add(AnalysisResult.ResolutionAttempt.success(
@@ -181,10 +181,10 @@ public class DependencyAnalyzer {
     }
 
     /**
-     * Infers the Maven scope for a dependency.
+     * Infère le scope Maven pour une dépendance.
      */
     private Scope inferScope(JarInfo jar, ProjectStructure project) {
-        // Based on JAR category
+        // Basé sur la catégorie du JAR
         switch (jar.category()) {
             case TEST:
                 return Scope.TEST;
@@ -194,7 +194,7 @@ public class DependencyAnalyzer {
                 return Scope.RUNTIME;
         }
 
-        // Based on artifact name patterns
+        // Basé sur les patterns de nom d'artefact
         String name = jar.name().toLowerCase();
         if (name.contains("-test") || name.contains("junit") ||
             name.contains("mockito") || name.contains("dbunit") ||
@@ -211,10 +211,10 @@ public class DependencyAnalyzer {
     }
 
     /**
-     * Removes duplicates and normalizes versions.
+     * Supprime les doublons et normalise les versions.
      */
     private List<DependencyInfo> deduplicateAndNormalize(List<DependencyInfo> dependencies) {
-        // Group by groupId:artifactId
+        // Grouper par groupId:artifactId
         Map<String, List<DependencyInfo>> grouped = dependencies.stream()
             .collect(Collectors.groupingBy(
                 d -> d.groupId() + ":" + d.artifactId(),
@@ -229,7 +229,7 @@ public class DependencyAnalyzer {
             if (versions.size() == 1) {
                 result.add(versions.get(0));
             } else {
-                // Pick the highest version or the one with non-LOCAL/non-SHA version
+                // Prendre la version la plus haute ou celle avec une version non-LOCAL/non-SHA
                 DependencyInfo best = versions.stream()
                     .filter(d -> !"LOCAL".equals(d.version()) && !d.version().startsWith("SHA-"))
                     .max(Comparator.comparing(d -> d.version()))
@@ -245,21 +245,21 @@ public class DependencyAnalyzer {
     }
 
     /**
-     * Returns the version extractor for use by other components.
+     * Retourne l'extracteur de version pour utilisation par d'autres composants.
      */
     public JarVersionExtractor getVersionExtractor() {
         return versionExtractor;
     }
 
     /**
-     * Returns the Artifactory client for use by other components.
+     * Retourne le client Artifactory pour utilisation par d'autres composants.
      */
     public ArtifactoryClient getArtifactoryClient() {
         return artifactoryClient;
     }
 
     /**
-     * Internal context for resolution process.
+     * Contexte interne pour le processus de résolution.
      */
     private record ResolutionContext(
         boolean isResolved,

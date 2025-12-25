@@ -13,14 +13,14 @@ import java.nio.file.Path;
 import java.util.*;
 
 /**
- * Parses Ant build.xml files to extract project structure information.
+ * Parse les fichiers Ant build.xml pour extraire les informations de structure du projet.
  */
 public class AntBuildParser {
 
     private static final Logger log = LoggerFactory.getLogger(AntBuildParser.class);
 
     /**
-     * Parses all build.xml files in the install directory.
+     * Parse tous les fichiers build.xml dans le répertoire install.
      */
     public List<AntBuildInfo> parseAll(Path projectRoot) {
         List<AntBuildInfo> builds = new ArrayList<>();
@@ -31,7 +31,7 @@ public class AntBuildParser {
             return builds;
         }
 
-        // Parse main build.xml
+        // Parser le build.xml principal
         Path mainBuild = installDir.resolve("build.xml");
         if (Files.exists(mainBuild)) {
             try {
@@ -41,7 +41,7 @@ public class AntBuildParser {
             }
         }
 
-        // Parse build.pic.xml if exists
+        // Parser build.pic.xml s'il existe
         Path picBuild = installDir.resolve("build.pic.xml");
         if (Files.exists(picBuild)) {
             try {
@@ -55,7 +55,7 @@ public class AntBuildParser {
     }
 
     /**
-     * Parses a single build.xml file.
+     * Parse un seul fichier build.xml.
      */
     public AntBuildInfo parse(Path buildFile, boolean isPic) throws DocumentException {
         log.info("Parsing Ant build file: {}", buildFile);
@@ -68,15 +68,15 @@ public class AntBuildParser {
             .buildFile(buildFile)
             .isPicBuild(isPic);
 
-        // Extract project name
+        // Extraire le nom du projet
         String projectName = root.attributeValue("name");
         builder.projectName(projectName);
 
-        // Extract default target
+        // Extraire la cible par défaut
         String defaultTarget = root.attributeValue("default");
         builder.defaultTarget(defaultTarget != null ? defaultTarget : "package");
 
-        // Extract properties
+        // Extraire les propriétés
         Map<String, String> properties = new LinkedHashMap<>();
         for (Element prop : root.elements("property")) {
             String name = prop.attributeValue("name");
@@ -87,18 +87,18 @@ public class AntBuildParser {
         }
         builder.properties(properties);
 
-        // Extract app.code
+        // Extraire app.code
         String appCode = properties.get("app.code");
         builder.appCode(appCode);
 
-        // Extract WAR name
+        // Extraire le nom du WAR
         String warName = properties.get("app.code.war");
         if (warName == null && appCode != null) {
             warName = appCode + "_J";
         }
         builder.warName(warName != null ? warName + "-app.war" : null);
 
-        // Extract source directories
+        // Extraire les répertoires sources
         List<String> sourceDirs = new ArrayList<>();
         String srcJava = properties.get("src.java");
         if (srcJava != null) {
@@ -110,7 +110,7 @@ public class AntBuildParser {
         }
         builder.sourceDirs(sourceDirs);
 
-        // Extract resource directories
+        // Extraire les répertoires de ressources
         List<String> resourceDirs = new ArrayList<>();
         String srcResources = properties.get("src.resources");
         if (srcResources != null) {
@@ -118,7 +118,7 @@ public class AntBuildParser {
         }
         builder.resourceDirs(resourceDirs);
 
-        // Extract lib directories
+        // Extraire les répertoires de librairies
         List<String> libDirs = new ArrayList<>();
         String lib = properties.get("lib");
         if (lib != null) {
@@ -126,22 +126,22 @@ public class AntBuildParser {
         }
         builder.libDirs(libDirs);
 
-        // Extract webapp directory
+        // Extraire le répertoire webapp
         String webapp = properties.get("webapp");
         if (webapp == null) {
             webapp = properties.get("webdir");
         }
         builder.webappDir(webapp);
 
-        // Extract EAR config directory
+        // Extraire le répertoire de configuration EAR
         String earConf = properties.get("earConf");
         builder.earConfDir(earConf);
 
-        // Extract classpath entries from compile.classpath path element
+        // Extraire les entrées classpath depuis l'élément path compile.classpath
         List<String> classpathEntries = extractClasspathEntries(root);
         builder.classpathEntries(classpathEntries);
 
-        // Extract excluded files
+        // Extraire les fichiers exclus
         List<String> excludedFiles = extractExcludedFiles(root);
         builder.excludedFiles(excludedFiles);
 
@@ -174,7 +174,7 @@ public class AntBuildParser {
     private List<String> extractExcludedFiles(Element root) {
         Set<String> excluded = new LinkedHashSet<>();
 
-        // Look for copy tasks with excludes
+        // Chercher les tâches copy avec des excludes
         for (Element target : root.elements("target")) {
             for (Element copy : target.elements("copy")) {
                 for (Element fileset : copy.elements("fileset")) {
@@ -189,7 +189,7 @@ public class AntBuildParser {
             }
         }
 
-        // Look for war task excludes
+        // Chercher les excludes de la tâche war
         for (Element target : root.elements("target")) {
             for (Element war : target.elements("war")) {
                 for (Element fileset : war.elements("fileset")) {

@@ -11,7 +11,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Parses the properties.conf file to extract internal dependencies.
+ * Parse le fichier properties.conf pour extraire les dépendances internes.
  */
 public class PropertiesConfParser {
 
@@ -19,7 +19,7 @@ public class PropertiesConfParser {
     private static final String DEPENDANCES_FAB_SECTION = "[DEPENDANCES_FAB]";
 
     /**
-     * Parses the properties.conf file and extracts DEPENDANCES_FAB section.
+     * Parse le fichier properties.conf et extrait la section DEPENDANCES_FAB.
      */
     public List<InternalDependency> parse(Path propertiesConf) {
         List<InternalDependency> dependencies = new ArrayList<>();
@@ -36,13 +36,13 @@ public class PropertiesConfParser {
             for (String line : lines) {
                 String trimmed = line.trim();
 
-                // Check for section headers
+                // Vérifier les en-têtes de section
                 if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
                     inDependancesSection = DEPENDANCES_FAB_SECTION.equals(trimmed);
                     continue;
                 }
 
-                // Parse dependency lines
+                // Parser les lignes de dépendance
                 if (inDependancesSection && !trimmed.isEmpty() && !trimmed.startsWith("#")) {
                     try {
                         InternalDependency dep = InternalDependency.parse(trimmed);
@@ -64,7 +64,7 @@ public class PropertiesConfParser {
     }
 
     /**
-     * Extracts other configuration sections from properties.conf.
+     * Extrait les autres sections de configuration depuis properties.conf.
      */
     public record PropertiesConfInfo(
         String osRefab,

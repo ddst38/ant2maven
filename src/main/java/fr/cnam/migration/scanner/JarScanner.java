@@ -18,14 +18,14 @@ import java.util.HexFormat;
 import java.util.List;
 
 /**
- * Scans for JAR and EAR files in a project directory.
+ * Scanne les fichiers JAR et EAR dans un répertoire de projet.
  */
 public class JarScanner {
 
     private static final Logger log = LoggerFactory.getLogger(JarScanner.class);
 
     /**
-     * Finds all JAR files in the given directory and subdirectories.
+     * Trouve tous les fichiers JAR dans le répertoire donné et ses sous-répertoires.
      */
     public List<JarInfo> findAllJars(Path directory) throws IOException {
         List<JarInfo> jars = new ArrayList<>();
@@ -49,7 +49,7 @@ public class JarScanner {
             @Override
             public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) {
                 String dirName = dir.getFileName().toString();
-                // Skip CVS, .git, target, build directories
+                // Ignorer les répertoires CVS, .git, target, build
                 if (dirName.equals("CVS") || dirName.equals(".git") ||
                     dirName.equals("target") || dirName.equals("build")) {
                     return FileVisitResult.SKIP_SUBTREE;
@@ -69,7 +69,7 @@ public class JarScanner {
     }
 
     /**
-     * Finds all EAR files in the given directory and subdirectories.
+     * Trouve tous les fichiers EAR dans le répertoire donné et ses sous-répertoires.
      */
     public List<Path> findAllEars(Path directory) throws IOException {
         List<Path> ears = new ArrayList<>();
@@ -99,7 +99,7 @@ public class JarScanner {
     }
 
     /**
-     * Computes SHA1 checksum for a file.
+     * Calcule le checksum SHA1 d'un fichier.
      */
     public String computeSha1(Path file) throws IOException, NoSuchAlgorithmException {
         MessageDigest digest = MessageDigest.getInstance("SHA-1");
@@ -114,7 +114,7 @@ public class JarScanner {
     }
 
     /**
-     * Categorizes JARs based on their location in the project.
+     * Catégorise les JARs en fonction de leur emplacement dans le projet.
      */
     public JarInfo.JarCategory categorizeByPath(Path jarPath, Path projectRoot) {
         String pathStr = projectRoot.relativize(jarPath).toString().toLowerCase();
