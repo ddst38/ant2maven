@@ -1,5 +1,6 @@
 package fr.cnam.migration.generator;
 
+import fr.cnam.migration.config.JarNameCleaner;
 import fr.cnam.migration.model.ProjectStructure;
 import fr.cnam.migration.model.ProjectType;
 import org.slf4j.Logger;
@@ -109,7 +110,7 @@ public class StructureCreator {
     }
 
     /**
-     * Copies EAR configuration files.
+     * Copie les fichiers de configuration EAR.
      */
     private void copyEarConfiguration(ProjectStructure project, Path earModule) throws IOException {
         if (project.earConfig() == null) {
@@ -152,22 +153,37 @@ public class StructureCreator {
     }
 
     /**
-     * Copies internal JARs to liblocale directory.
+     * Copie les JARs internes vers le répertoire liblocale.
+     *
+     * Les noms de JARs sont nettoyés pour supprimer les préfixes DEPFAB. et les codes projet.
+     * Le préfixe DEPFAB. indique une dépendance de fabrication qui était fournie par l'IC ANT.
+     *
+     * Exemples de nettoyage :
+     * - DEPFAB.W1_ServiceImageDecompte_v1.0_client.jar → W1_ServiceImageDecompte_v1.0_client.jar
+     * - DEPFAB.S8_J.nimbus-jose-jwt-4.23-jdk16.jar → nimbus-jose-jwt-4.23-jdk16.jar
      */
     private void copyInternalJars(ProjectStructure project, Path liblocale) throws IOException {
         int count = 0;
+        int cleaned = 0;
         for (var jar : project.allJars()) {
             if (jar.isInternalArtifact() && Files.exists(jar.path())) {
-                Files.copy(jar.path(), liblocale.resolve(jar.name()),
+                // Nettoyer le nom du JAR (supprimer DEPFAB. et code projet si présents)
+                String cleanedName = JarNameCleaner.clean(jar.name());
+
+                if (!cleanedName.equals(jar.name())) {
+                    cleaned++;
+                }
+
+                Files.copy(jar.path(), liblocale.resolve(cleanedName),
                     StandardCopyOption.REPLACE_EXISTING);
                 count++;
             }
         }
-        log.info("Copied {} internal JARs to liblocale", count);
+        log.info("Copié {} JARs internes vers liblocale ({} noms nettoyés)", count, cleaned);
     }
 
     /**
-     * Copies a directory recursively with a filter.
+     * Copie un répertoire récursivement avec un filtre.
      */
     private void copyDirectory(Path source, Path target, Predicate<Path> filter)
             throws IOException {
