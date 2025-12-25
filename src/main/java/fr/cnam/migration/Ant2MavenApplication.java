@@ -18,10 +18,10 @@ import java.nio.file.Path;
 import java.util.concurrent.Callable;
 
 /**
- * Ant to Maven Migration Tool.
+ * Outil de migration Ant vers Maven.
  *
- * Transforms Ant-based CVS projects into Maven projects with full migration
- * (source reorganization + pom.xml generation + Maven structure).
+ * Transforme les projets CVS basés sur Ant en projets Maven avec migration complète
+ * (réorganisation des sources + génération du pom.xml + structure Maven).
  */
 @Command(
     name = "ant2maven",
@@ -33,7 +33,7 @@ public class Ant2MavenApplication implements Callable<Integer> {
 
     private static final Logger log = LoggerFactory.getLogger(Ant2MavenApplication.class);
 
-    // === Basic Options ===
+    // === Options de base ===
 
     @Option(
         names = {"-p", "--project"},
@@ -92,7 +92,7 @@ public class Ant2MavenApplication implements Callable<Integer> {
     )
     private String basePackage;
 
-    // === Artifactory Options ===
+    // === Options Artifactory ===
 
     @Option(
         names = {"--artifactory-url"},

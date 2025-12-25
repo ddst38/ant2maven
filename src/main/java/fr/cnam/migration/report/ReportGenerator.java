@@ -20,14 +20,14 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 /**
- * Generates migration reports, installation scripts, and deployment scripts.
+ * Génère les rapports de migration, scripts d'installation et scripts de déploiement.
  *
- * Features:
- * - Migration report (HTML)
- * - Unresolved libraries CSV (libnotfound.csv)
- * - Local installation script (install-local-jars.sh)
- * - Artifactory deployment script (deploy-to-artifactory.sh)
- * - SHA-based versioning for unversioned JARs to prevent version collisions
+ * Fonctionnalités :
+ * - Rapport de migration (HTML)
+ * - CSV des bibliothèques non résolues (libnotfound.csv)
+ * - Script d'installation locale (install-local-jars.sh)
+ * - Script de déploiement Artifactory (deploy-to-artifactory.sh)
+ * - Versionnement basé sur SHA pour les JARs non versionnés afin d'éviter les collisions
  */
 public class ReportGenerator {
 
@@ -49,7 +49,7 @@ public class ReportGenerator {
     }
 
     /**
-     * Generates the libnotfound.csv file for unresolved JARs.
+     * Génère le fichier libnotfound.csv pour les JARs non résolus.
      */
     public void generateLibNotFoundCsv(AnalysisResult analysis, Path outputDir)
             throws IOException {
