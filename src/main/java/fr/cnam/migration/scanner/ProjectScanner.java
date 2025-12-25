@@ -118,7 +118,7 @@ public class ProjectScanner {
         }
 
         try (Stream<Path> dirs = Files.list(projectRoot)) {
-            // Look for Eclipse-style: directory with src (not src/main) and WebContent
+            // Chercher le style Eclipse : répertoire avec src (pas src/main) et WebContent
             boolean hasEclipseStyle = dirs
                 .filter(Files::isDirectory)
                 .filter(p -> !p.getFileName().toString().equals("install"))
@@ -136,13 +136,13 @@ public class ProjectScanner {
         } catch (IOException ignored) {
         }
 
-        // Default to Maven style
+        // Par défaut style Maven
         log.warn("Could not detect project type, defaulting to MAVEN_STYLE");
         return ProjectType.MAVEN_STYLE;
     }
 
     /**
-     * Finds the main application directory dynamically.
+     * Trouve le répertoire principal de l'application dynamiquement.
      */
     private Path findAppDirectory(Path projectRoot, ProjectType type) {
         try (Stream<Path> dirs = Files.list(projectRoot)) {
@@ -150,7 +150,7 @@ public class ProjectScanner {
                 .filter(Files::isDirectory)
                 .filter(p -> {
                     String name = p.getFileName().toString();
-                    // Skip install and ear directories
+                    // Ignorer les répertoires install et ear
                     if (name.equals("install") || name.toLowerCase().endsWith("ear")) {
                         return false;
                     }
@@ -159,10 +159,10 @@ public class ProjectScanner {
                     }
 
                     if (type == ProjectType.MAVEN_STYLE) {
-                        // Look for *-app directory with Maven structure
+                        // Chercher un répertoire *-app avec structure Maven
                         return name.endsWith("-app") && Files.exists(p.resolve("src/main/java"));
                     } else {
-                        // Eclipse style: has src or WebContent
+                        // Style Eclipse : a src ou WebContent
                         return Files.exists(p.resolve("src")) || Files.exists(p.resolve("WebContent"));
                     }
                 })
@@ -188,7 +188,7 @@ public class ProjectScanner {
                 builder.testResourcesDir(appDir.resolve("src/test/resources"));
                 builder.webappDir(appDir.resolve("src/main/webapp"));
             } else {
-                // Eclipse style
+                // Style Eclipse
                 builder.mainJavaDir(appDir.resolve("src"));
                 builder.mainResourcesDir(appDir.resolve("conf"));
                 builder.testJavaDir(appDir.resolve("test"));
@@ -196,7 +196,7 @@ public class ProjectScanner {
             }
         }
 
-        // Count Java files
+        // Compter les fichiers Java
         ProjectStructure.SourceLayout layout = builder.build();
         if (layout.mainJavaDir() != null && Files.exists(layout.mainJavaDir())) {
             builder.mainJavaFileCount(countJavaFiles(layout.mainJavaDir()));
@@ -224,7 +224,7 @@ public class ProjectScanner {
     }
 
     /**
-     * Finds the EAR directory dynamically.
+     * Trouve le répertoire EAR dynamiquement.
      */
     private Path findEarDirectory(Path projectRoot) {
         try (Stream<Path> dirs = Files.list(projectRoot)) {
@@ -239,39 +239,39 @@ public class ProjectScanner {
     }
 
     /**
-     * Extracts EAR configuration from the project.
+     * Extrait la configuration EAR du projet.
      */
     private EarConfiguration extractEarConfig(Path projectRoot, ProjectType type) {
         EarConfiguration.Builder builder = EarConfiguration.builder();
 
-        // Find EAR directory
+        // Trouver le répertoire EAR
         Path earDir = findEarDirectory(projectRoot);
         if (earDir == null) {
             log.warn("EAR directory not found");
             return builder.build();
         }
 
-        // Find META-INF
+        // Trouver META-INF
         Path metaInf = earDir.resolve("EarContent/META-INF");
         if (!Files.exists(metaInf)) {
             metaInf = earDir.resolve("META-INF");
         }
 
-        // Parse application.xml
+        // Parser application.xml
         Path applicationXml = metaInf.resolve("application.xml");
         if (Files.exists(applicationXml)) {
             builder.applicationXml(applicationXml);
             parseApplicationXml(applicationXml, builder);
         }
 
-        // Find weblogic-application.xml
+        // Trouver weblogic-application.xml
         Path weblogicXml = metaInf.resolve("weblogic-application.xml");
         if (Files.exists(weblogicXml)) {
             builder.weblogicApplicationXml(weblogicXml);
             parseWeblogicApplicationXml(weblogicXml, builder);
         }
 
-        // Find APP-INF/lib JARs
+        // Trouver les JARs APP-INF/lib
         Path appInfLib = earDir.resolve("EarContent/APP-INF/lib");
         if (Files.exists(appInfLib)) {
             try (Stream<Path> jars = Files.list(appInfLib)) {
@@ -280,7 +280,7 @@ public class ProjectScanner {
             }
         }
 
-        // Find APP-INF/conf files
+        // Trouver les fichiers APP-INF/conf
         Path appInfConf = earDir.resolve("EarContent/APP-INF/conf");
         if (Files.exists(appInfConf)) {
             try (Stream<Path> files = Files.list(appInfConf)) {
@@ -298,13 +298,13 @@ public class ProjectScanner {
             Document doc = reader.read(file.toFile());
             Element root = doc.getRootElement();
 
-            // Get display-name
+            // Récupérer le display-name
             Element displayName = root.element("display-name");
             if (displayName != null) {
                 builder.displayName(displayName.getTextTrim());
             }
 
-            // Get web module info
+            // Récupérer les infos du module web
             for (Element module : root.elements("module")) {
                 Element web = module.element("web");
                 if (web != null) {
@@ -329,7 +329,7 @@ public class ProjectScanner {
             Document doc = reader.read(file.toFile());
             Element root = doc.getRootElement();
 
-            // Get library-ref
+            // Récupérer library-ref
             Element libraryRef = root.element("library-ref");
             if (libraryRef != null) {
                 Element libName = libraryRef.element("library-name");
@@ -338,7 +338,7 @@ public class ProjectScanner {
                 }
             }
 
-            // Get prefer-application-packages
+            // Récupérer prefer-application-packages
             Element preferPkgs = root.element("prefer-application-packages");
             if (preferPkgs != null) {
                 List<String> packages = new ArrayList<>();

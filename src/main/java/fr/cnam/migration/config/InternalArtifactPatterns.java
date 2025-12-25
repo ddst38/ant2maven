@@ -201,7 +201,7 @@ public class InternalArtifactPatterns {
             jarName.matches("^[A-Z]+_[A-Z]\\..*") ||  // XXX_Y.something
             jarName.matches("^s8[a-z]?-.*") ||         // s8xxx- or s8h-xxx
             jarName.matches("^Service[A-Z]+_.*") ||    // ServiceXXX_
-            jarName.matches("^[A-Z]+\\d{6,}.*\\.jar$")) {  // Project codes like SOCA010000J
+            jarName.matches("^[A-Z]+\\d{6,}.*\\.jar$")) {  // Codes projet comme SOCA010000J
             return true;
         }
 

@@ -100,7 +100,7 @@ public class StructureCreator {
             log.info("Copied test Java sources: {} files", layout.testJavaFileCount());
         }
 
-        // Copy test resources
+        // Copier les ressources de test
         if (layout.testResourcesDir() != null && Files.exists(layout.testResourcesDir())) {
             copyDirectory(layout.testResourcesDir(), webModule.resolve("src/test/resources"),
                 path -> true);
@@ -118,7 +118,7 @@ public class StructureCreator {
 
         Path metaInf = earModule.resolve("src/main/application/META-INF");
 
-        // Copy application.xml
+        // Copier application.xml
         if (project.earConfig().applicationXml() != null) {
             Path source = project.earConfig().applicationXml();
             if (Files.exists(source)) {
@@ -128,7 +128,7 @@ public class StructureCreator {
             }
         }
 
-        // Copy weblogic-application.xml
+        // Copier weblogic-application.xml
         if (project.earConfig().weblogicApplicationXml() != null) {
             Path source = project.earConfig().weblogicApplicationXml();
             if (Files.exists(source)) {
@@ -138,7 +138,7 @@ public class StructureCreator {
             }
         }
 
-        // Copy APP-INF/conf files if present
+        // Copier les fichiers APP-INF/conf si présents
         if (project.earConfig().appInfConfFiles() != null) {
             Path confDir = earModule.resolve("src/main/conf");
             Files.createDirectories(confDir);
@@ -179,7 +179,7 @@ public class StructureCreator {
             @Override
             public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs)
                     throws IOException {
-                // Skip CVS directories
+                // Ignorer les répertoires CVS
                 if (dir.getFileName().toString().equals("CVS")) {
                     return FileVisitResult.SKIP_SUBTREE;
                 }
@@ -210,7 +210,7 @@ public class StructureCreator {
     }
 
     /**
-     * Checks if a file should be excluded from copying (environment-specific configs).
+     * Vérifie si un fichier doit être exclu de la copie (configurations spécifiques à l'environnement).
      */
     private boolean isExcludedConfig(Path path) {
         String name = path.getFileName().toString().toLowerCase();

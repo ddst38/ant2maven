@@ -111,7 +111,7 @@ public record InternalDependency(
     public MavenCoordinate toMavenCoordinate(String basePackage) {
         String groupId = basePackage + "." + projectCode.toLowerCase();
         String artifactId = projectCode.toLowerCase() + "-lib";
-        String version = code; // Use the full code as version identifier
+        String version = code; // Utiliser le code complet comme identifiant de version
         return new MavenCoordinate(groupId, artifactId, version);
     }
 }

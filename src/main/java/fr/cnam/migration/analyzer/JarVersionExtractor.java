@@ -52,11 +52,11 @@ public class JarVersionExtractor {
         "Bundle-Version",
         "Specification-Version",
         "Version",
-        "Manifest-Version"  // Last resort, usually just "1.0"
+        "Manifest-Version"  // Dernier recours, généralement juste "1.0"
     );
 
     /**
-     * Result of version extraction.
+     * Résultat de l'extraction de version.
      */
     public record VersionInfo(
         String version,
@@ -81,7 +81,7 @@ public class JarVersionExtractor {
         }
 
         public static VersionInfo fromSha(String artifactName, String sha) {
-            // Use first 8 chars of SHA for readability
+            // Utiliser les 8 premiers caractères du SHA pour la lisibilité
             String shortSha = sha.length() > 8 ? sha.substring(0, 8) : sha;
             return new VersionInfo("SHA-" + shortSha, artifactName, VersionSource.SHA_HASH, true);
         }
@@ -92,7 +92,7 @@ public class JarVersionExtractor {
     }
 
     /**
-     * Source of version information.
+     * Source de l'information de version.
      */
     public enum VersionSource {
         FILENAME("Extracted from filename"),
@@ -114,40 +114,40 @@ public class JarVersionExtractor {
     }
 
     /**
-     * Extracts version information from a JAR file using all available strategies.
+     * Extrait les informations de version d'un fichier JAR en utilisant toutes les stratégies disponibles.
      */
     public VersionInfo extractVersion(JarInfo jar) {
         return extractVersion(jar.path(), jar.name(), jar.sha1());
     }
 
     /**
-     * Extracts version information from a JAR file using all available strategies.
+     * Extrait les informations de version d'un fichier JAR en utilisant toutes les stratégies disponibles.
      */
     public VersionInfo extractVersion(Path jarPath, String jarName, String sha1) {
-        // Strategy 1: Try filename patterns
+        // Stratégie 1 : Essayer les patterns de nom de fichier
         VersionInfo fromFilename = extractFromFilename(jarName);
         if (fromFilename != null && isValidVersion(fromFilename.version())) {
             log.debug("Version from filename: {} -> {}", jarName, fromFilename.version());
             return fromFilename;
         }
 
-        // Strategy 2-4: Try JAR content analysis
+        // Stratégies 2-4 : Essayer l'analyse du contenu JAR
         try (JarFile jarFile = new JarFile(jarPath.toFile())) {
-            // Strategy 2: MANIFEST.MF
+            // Stratégie 2 : MANIFEST.MF
             VersionInfo fromManifest = extractFromManifest(jarFile, jarName);
             if (fromManifest != null && isValidVersion(fromManifest.version())) {
                 log.debug("Version from manifest: {} -> {}", jarName, fromManifest.version());
                 return fromManifest;
             }
 
-            // Strategy 3: pom.properties
+            // Stratégie 3 : pom.properties
             VersionInfo fromPom = extractFromPomProperties(jarFile, jarName);
             if (fromPom != null && isValidVersion(fromPom.version())) {
                 log.debug("Version from pom.properties: {} -> {}", jarName, fromPom.version());
                 return fromPom;
             }
 
-            // Strategy 4: version files
+            // Stratégie 4 : fichiers de version
             VersionInfo fromVersionFile = extractFromVersionFiles(jarFile, jarName);
             if (fromVersionFile != null && isValidVersion(fromVersionFile.version())) {
                 log.debug("Version from version file: {} -> {}", jarName, fromVersionFile.version());
@@ -158,19 +158,19 @@ public class JarVersionExtractor {
             log.warn("Could not read JAR file {}: {}", jarPath, e.getMessage());
         }
 
-        // Strategy 5: Fall back to SHA-based versioning
+        // Stratégie 5 : Repli sur le versionnement basé SHA
         if (sha1 != null && !sha1.isBlank()) {
             log.debug("Using SHA-based version for {}: SHA-{}", jarName, sha1.substring(0, 8));
             return VersionInfo.fromSha(extractArtifactName(jarName), sha1);
         }
 
-        // No version found
+        // Aucune version trouvée
         log.warn("Could not determine version for: {}", jarName);
         return VersionInfo.unknown(extractArtifactName(jarName));
     }
 
     /**
-     * Extracts version from filename using regex patterns.
+     * Extrait la version depuis le nom de fichier en utilisant des patterns regex.
      */
     private VersionInfo extractFromFilename(String jarName) {
         for (Pattern pattern : VERSION_PATTERNS) {
@@ -185,7 +185,7 @@ public class JarVersionExtractor {
     }
 
     /**
-     * Extracts version from MANIFEST.MF attributes.
+     * Extrait la version depuis les attributs MANIFEST.MF.
      */
     private VersionInfo extractFromManifest(JarFile jarFile, String jarName) throws IOException {
         Manifest manifest = jarFile.getManifest();
@@ -196,7 +196,7 @@ public class JarVersionExtractor {
         Attributes mainAttrs = manifest.getMainAttributes();
         String artifactName = extractArtifactName(jarName);
 
-        // Try to get artifact name from manifest
+        // Essayer de récupérer le nom de l'artefact depuis le manifest
         String implTitle = mainAttrs.getValue("Implementation-Title");
         String bundleName = mainAttrs.getValue("Bundle-Name");
         String symbolicName = mainAttrs.getValue("Bundle-SymbolicName");
@@ -209,7 +209,7 @@ public class JarVersionExtractor {
             artifactName = symbolicName;
         }
 
-        // Try each version attribute
+        // Essayer chaque attribut de version
         for (String attr : MANIFEST_VERSION_ATTRS) {
             String version = mainAttrs.getValue(attr);
             if (version != null && !version.isBlank() && isValidVersion(version)) {
@@ -221,7 +221,7 @@ public class JarVersionExtractor {
     }
 
     /**
-     * Extracts version from META-INF/maven/.../pom.properties.
+     * Extrait la version depuis META-INF/maven/.../pom.properties.
      */
     private VersionInfo extractFromPomProperties(JarFile jarFile, String jarName) throws IOException {
         Enumeration<JarEntry> entries = jarFile.entries();
@@ -250,10 +250,10 @@ public class JarVersionExtractor {
     }
 
     /**
-     * Extracts version from common version files inside the JAR.
+     * Extrait la version depuis les fichiers de version courants à l'intérieur du JAR.
      */
     private VersionInfo extractFromVersionFiles(JarFile jarFile, String jarName) throws IOException {
-        // Common version file patterns
+        // Patterns de fichiers de version courants
         List<String> versionFilePatterns = List.of(
             "version.properties",
             "version.txt",
@@ -268,7 +268,7 @@ public class JarVersionExtractor {
             JarEntry entry = entries.nextElement();
             String entryName = entry.getName();
 
-            // Check if this is a version file
+            // Vérifier si c'est un fichier de version
             for (String pattern : versionFilePatterns) {
                 if (entryName.endsWith(pattern) || entryName.equals(pattern)) {
                     try (InputStream is = jarFile.getInputStream(entry)) {
@@ -285,14 +285,14 @@ public class JarVersionExtractor {
     }
 
     /**
-     * Extracts version from a properties or text file stream.
+     * Extrait la version depuis un flux de fichier properties ou texte.
      */
     private String extractVersionFromStream(InputStream is, String fileName) throws IOException {
         if (fileName.endsWith(".properties")) {
             Properties props = new Properties();
             props.load(is);
 
-            // Try common property names
+            // Essayer les noms de propriétés courants
             for (String key : List.of("version", "Version", "VERSION",
                                        "build.version", "project.version",
                                        "implementation.version")) {
@@ -302,10 +302,10 @@ public class JarVersionExtractor {
                 }
             }
         } else {
-            // Plain text file - read first line
+            // Fichier texte brut - lire la première ligne
             String content = new String(is.readAllBytes()).trim();
             if (!content.isEmpty()) {
-                // Try to extract version pattern from content
+                // Essayer d'extraire le pattern de version du contenu
                 Matcher versionMatcher = Pattern.compile("(\\d+\\.\\d+(?:\\.\\d+)?(?:[.-][A-Za-z0-9]+)?)").matcher(content);
                 if (versionMatcher.find()) {
                     return versionMatcher.group(1);
@@ -317,13 +317,13 @@ public class JarVersionExtractor {
     }
 
     /**
-     * Extracts artifact name from JAR filename.
+     * Extrait le nom de l'artefact depuis le nom de fichier JAR.
      */
     private String extractArtifactName(String jarName) {
-        // Remove .jar extension
+        // Supprimer l'extension .jar
         String name = jarName.replaceAll("\\.jar$", "");
 
-        // Try to remove version suffix
+        // Essayer de supprimer le suffixe de version
         for (Pattern pattern : VERSION_PATTERNS) {
             Matcher matcher = pattern.matcher(jarName);
             if (matcher.matches()) {
@@ -331,50 +331,50 @@ public class JarVersionExtractor {
             }
         }
 
-        // Remove common suffixes
+        // Supprimer les suffixes courants
         name = name.replaceAll("-\\d+\\.\\d+.*$", "");
 
         return name;
     }
 
     /**
-     * Checks if a version string is valid (not just "1.0" or similar generic values).
+     * Vérifie si une chaîne de version est valide (pas juste "1.0" ou des valeurs génériques similaires).
      */
     private boolean isValidVersion(String version) {
         if (version == null || version.isBlank()) {
             return false;
         }
 
-        // Filter out generic/meaningless versions
+        // Filtrer les versions génériques/sans signification
         Set<String> genericVersions = Set.of("1.0", "1.0.0", "0.0.0", "0.0.1");
         if (genericVersions.contains(version.trim())) {
             return false;
         }
 
-        // Must contain at least one digit
+        // Doit contenir au moins un chiffre
         return version.matches(".*\\d.*");
     }
 
     /**
-     * Cleans up a version string.
+     * Nettoie une chaîne de version.
      */
     private String cleanVersion(String version) {
         if (version == null) {
             return null;
         }
 
-        // Remove common prefixes
+        // Supprimer les préfixes courants
         version = version.replaceAll("^v", "");
         version = version.replaceAll("^version[=:]?\\s*", "");
 
-        // Trim whitespace
+        // Supprimer les espaces
         return version.trim();
     }
 
     /**
-     * Generates a unique artifact identifier using SHA for unversioned JARs.
-     * This prevents version collisions when different projects have
-     * different versions of the same-named JAR.
+     * Génère un identifiant d'artefact unique en utilisant le SHA pour les JARs sans version.
+     * Cela évite les collisions de version quand différents projets ont
+     * différentes versions du même JAR.
      */
     public String generateShaBasedArtifactId(String originalName, String sha1) {
         String baseName = extractArtifactName(originalName);

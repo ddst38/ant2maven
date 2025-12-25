@@ -103,7 +103,7 @@ public class ProjectGenerator {
     }
 
     /**
-     * Generates the WAR module POM.
+     * Génère le POM du module WAR.
      */
     private Path generateWarPom(ProjectStructure project, AnalysisResult analysis,
                                 Path webModuleDir) {
@@ -120,16 +120,16 @@ public class ProjectGenerator {
         model.put("warName", project.primaryBuild() != null ?
             project.primaryBuild().warName().replace(".war", "") : moduleName);
 
-        // Dependencies
+        // Dépendances
         List<Map<String, String>> dependencies = new ArrayList<>();
         for (DependencyInfo dep : analysis.resolved()) {
             if (dep.scope() != Scope.TEST || config.isPicBuild()) {
                 Map<String, String> depMap = new LinkedHashMap<>();
                 depMap.put("groupId", dep.groupId());
                 depMap.put("artifactId", dep.artifactId());
-                // Use property reference or direct version
+                // Utiliser une référence de propriété ou version directe
                 if (shouldUsePropertyVersion(dep)) {
-                    depMap.put("version", null); // Will be managed by parent
+                    depMap.put("version", null); // Sera géré par le parent
                 } else {
                     depMap.put("version", dep.version());
                 }
@@ -141,7 +141,7 @@ public class ProjectGenerator {
         }
         model.put("dependencies", dependencies);
 
-        // Excluded resources
+        // Ressources exclues
         if (project.primaryBuild() != null) {
             model.put("excludedResources", project.primaryBuild().excludedFiles());
         }
@@ -152,7 +152,7 @@ public class ProjectGenerator {
     }
 
     /**
-     * Generates the EAR module POM.
+     * Génère le POM du module EAR.
      */
     private Path generateEarPom(ProjectStructure project, Path earModuleDir) {
         String projectName = project.name().toLowerCase();
@@ -167,7 +167,7 @@ public class ProjectGenerator {
         model.put("artifactId", moduleName + "-ear");
         model.put("warArtifactId", moduleName + "-web");
 
-        // EAR configuration
+        // Configuration EAR
         EarConfiguration earConfig = project.earConfig();
         if (earConfig != null) {
             model.put("contextRoot", earConfig.contextRoot() != null ?
@@ -178,12 +178,12 @@ public class ProjectGenerator {
             model.put("hasAppInfConf", earConfig.appInfConfFiles() != null &&
                 !earConfig.appInfConfFiles().isEmpty());
 
-            // APP-INF/lib dependencies
+            // Dépendances APP-INF/lib
             if (earConfig.hasAppInfLib()) {
                 List<Map<String, String>> appInfLibs = new ArrayList<>();
                 for (Path jarPath : earConfig.appInfLibJars()) {
                     String jarName = jarPath.getFileName().toString();
-                    // These are typically internal artifacts
+                    // Ce sont typiquement des artefacts internes
                     appInfLibs.add(Map.of(
                         "groupId", config.basePackage() + ".internal",
                         "artifactId", jarName.replace(".jar", ""),
@@ -205,12 +205,12 @@ public class ProjectGenerator {
     }
 
     /**
-     * Builds version properties from resolved dependencies.
+     * Construit les propriétés de version à partir des dépendances résolues.
      */
     private Map<String, String> buildVersionProperties(AnalysisResult analysis) {
         Map<String, String> properties = new LinkedHashMap<>();
 
-        // Group dependencies by framework/family
+        // Grouper les dépendances par framework/famille
         Map<String, String> familyVersions = new HashMap<>();
 
         for (DependencyInfo dep : analysis.resolved()) {
@@ -220,7 +220,7 @@ public class ProjectGenerator {
             }
         }
 
-        // Convert to property names
+        // Convertir en noms de propriétés
         if (familyVersions.containsKey("springframework")) {
             properties.put("spring.version", familyVersions.get("springframework"));
         }
@@ -254,7 +254,7 @@ public class ProjectGenerator {
     }
 
     /**
-     * Builds dependency management section.
+     * Construit la section de gestion des dépendances.
      */
     private List<Map<String, String>> buildDependencyManagement(AnalysisResult analysis) {
         return analysis.resolved().stream()
@@ -278,21 +278,21 @@ public class ProjectGenerator {
     }
 
     /**
-     * Installs Maven wrapper.
+     * Installe le Maven wrapper.
      */
     private void installMavenWrapper(Path outputDir) throws IOException {
-        // Create .mvn/wrapper directory
+        // Créer le répertoire .mvn/wrapper
         Path wrapperDir = outputDir.resolve(".mvn/wrapper");
         Files.createDirectories(wrapperDir);
 
-        // Create maven-wrapper.properties
+        // Créer maven-wrapper.properties
         String wrapperProps = """
             distributionUrl=https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/3.9.6/apache-maven-3.9.6-bin.zip
             wrapperUrl=https://repo.maven.apache.org/maven2/org/apache/maven/wrapper/maven-wrapper/3.2.0/maven-wrapper-3.2.0.jar
             """;
         Files.writeString(wrapperDir.resolve("maven-wrapper.properties"), wrapperProps);
 
-        // Create mvnw script
+        // Créer le script mvnw
         String mvnw = """
             #!/bin/sh
             # Maven Wrapper script
@@ -313,7 +313,7 @@ public class ProjectGenerator {
         Files.writeString(mvnwPath, mvnw);
         mvnwPath.toFile().setExecutable(true);
 
-        // Create mvnw.cmd for Windows
+        // Créer mvnw.cmd pour Windows
         String mvnwCmd = """
             @echo off
             setlocal
@@ -334,7 +334,7 @@ public class ProjectGenerator {
     }
 
     /**
-     * Result of project generation.
+     * Résultat de la génération du projet.
      */
     public record GenerationResult(
         Path outputDir,

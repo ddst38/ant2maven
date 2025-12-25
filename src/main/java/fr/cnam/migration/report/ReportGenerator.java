@@ -87,25 +87,25 @@ public class ReportGenerator {
     }
 
     /**
-     * Generates the install-local-jars.sh script for LOCAL deployment mode.
-     * Uses SHA-based versioning for JARs without determinable versions.
+     * Génère le script install-local-jars.sh pour le mode de déploiement LOCAL.
+     * Utilise le versionnement basé sur SHA pour les JARs sans version détectable.
      */
     public void generateInstallScript(AnalysisResult analysis, Path outputDir,
                                       JarVersionExtractor versionExtractor) throws IOException {
         List<Map<String, String>> internalJars = new ArrayList<>();
         String basePackage = config != null ? config.basePackage() : MigrationConfig.DEFAULT_BASE_PACKAGE;
 
-        // Collect internal dependencies
+        // Collecter les dépendances internes
         for (DependencyInfo dep : analysis.internalDependencies()) {
             JarInfo jar = dep.sourceJar();
 
-            // Extract version info, using SHA if needed
+            // Extraire les infos de version, en utilisant SHA si nécessaire
             JarVersionExtractor.VersionInfo versionInfo = versionExtractor.extractVersion(jar);
 
             String version = versionInfo.version();
             String artifactId = versionInfo.artifactName();
 
-            // If SHA-based, use the SHA-based artifact ID to prevent collisions
+            // Si basé sur SHA, utiliser l'ID d'artefact basé sur SHA pour éviter les collisions
             if (versionInfo.isShaBasedVersion() && jar.sha1() != null) {
                 artifactId = versionExtractor.generateShaBasedArtifactId(jar.name(), jar.sha1());
             }
@@ -120,7 +120,7 @@ public class ReportGenerator {
             ));
         }
 
-        // Also include unresolved JARs that look internal
+        // Inclure aussi les JARs non résolus qui semblent internes
         for (AnalysisResult.UnresolvedJar unresolved : analysis.unresolved()) {
             JarInfo jar = unresolved.jar();
             if (jar.isInternalArtifact()) {
@@ -129,7 +129,7 @@ public class ReportGenerator {
                 String version = versionInfo.version();
                 String artifactId = versionInfo.artifactName();
 
-                // If SHA-based, use the SHA-based artifact ID
+                // Si basé sur SHA, utiliser l'ID d'artefact basé sur SHA
                 if (versionInfo.isShaBasedVersion() && jar.sha1() != null) {
                     artifactId = versionExtractor.generateShaBasedArtifactId(jar.name(), jar.sha1());
                 }
@@ -148,7 +148,7 @@ public class ReportGenerator {
             }
         }
 
-        // Generate the script
+        // Générer le script
         Path scriptDir = outputDir.resolve("liblocale");
         Files.createDirectories(scriptDir);
 
@@ -191,15 +191,15 @@ public class ReportGenerator {
     }
 
     /**
-     * Generates the install script without version extractor (backward compatibility).
+     * Génère le script d'installation sans extracteur de version (compatibilité ascendante).
      */
     public void generateInstallScript(AnalysisResult analysis, Path outputDir) throws IOException {
         generateInstallScript(analysis, outputDir, new JarVersionExtractor());
     }
 
     /**
-     * Generates the deploy-to-artifactory.sh script for REMOTE deployment mode.
-     * Uses SHA-based versioning for JARs without determinable versions.
+     * Génère le script deploy-to-artifactory.sh pour le mode de déploiement REMOTE.
+     * Utilise le versionnement basé sur SHA pour les JARs sans version détectable.
      */
     public void generateDeployScript(AnalysisResult analysis, Path outputDir,
                                      JarVersionExtractor versionExtractor,
@@ -212,7 +212,7 @@ public class ReportGenerator {
         List<Map<String, String>> deployableJars = new ArrayList<>();
         String basePackage = config.basePackage();
 
-        // Collect internal dependencies that need to be deployed
+        // Collecter les dépendances internes à déployer
         for (DependencyInfo dep : analysis.internalDependencies()) {
             JarInfo jar = dep.sourceJar();
             JarVersionExtractor.VersionInfo versionInfo = versionExtractor.extractVersion(jar);
@@ -220,7 +220,7 @@ public class ReportGenerator {
             String version = versionInfo.version();
             String artifactId = versionInfo.artifactName();
 
-            // Use SHA-based artifact ID for unversioned JARs
+            // Utiliser l'ID d'artefact basé sur SHA pour les JARs non versionnés
             if (versionInfo.isShaBasedVersion() && jar.sha1() != null) {
                 artifactId = versionExtractor.generateShaBasedArtifactId(jar.name(), jar.sha1());
             }
@@ -239,7 +239,7 @@ public class ReportGenerator {
             ));
         }
 
-        // Also include unresolved internal JARs
+        // Inclure aussi les JARs internes non résolus
         for (AnalysisResult.UnresolvedJar unresolved : analysis.unresolved()) {
             JarInfo jar = unresolved.jar();
             if (jar.isInternalArtifact()) {
@@ -270,7 +270,7 @@ public class ReportGenerator {
             }
         }
 
-        // Generate the deploy script
+        // Générer le script de déploiement
         Path scriptDir = outputDir.resolve("liblocale");
         Files.createDirectories(scriptDir);
 
@@ -324,7 +324,7 @@ public class ReportGenerator {
     }
 
     /**
-     * Generates an HTML migration report.
+     * Génère un rapport de migration HTML.
      */
     public void generateMigrationReport(ProjectStructure project, AnalysisResult analysis,
                                         Path outputDir) throws IOException {
@@ -360,7 +360,7 @@ public class ReportGenerator {
             <body>
             """.formatted(project.name()));
 
-        // Header
+        // En-tête
         html.append("<h1>Migration Report: ").append(project.name()).append("</h1>");
         html.append("<p>Generated: ")
             .append(LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")))
@@ -397,7 +397,7 @@ public class ReportGenerator {
         html.append("<div class='stat-value'>").append(String.format("%.1f%%", analysis.successRate())).append("</div>");
         html.append("<div class='stat-label'>Success Rate</div></div>");
 
-        // Resolution by method
+        // Résolution par méthode
         html.append("<h2>Resolution Methods</h2>");
         html.append("<table><tr><th>Method</th><th>Count</th></tr>");
         Map<ResolutionMethod, List<DependencyInfo>> byMethod = analysis.byMethod();
@@ -412,7 +412,7 @@ public class ReportGenerator {
         }
         html.append("</table>");
 
-        // Dependencies by scope
+        // Dépendances par scope
         html.append("<h2>Dependencies by Scope</h2>");
         html.append("<table><tr><th>Scope</th><th>Count</th></tr>");
         Map<Scope, List<DependencyInfo>> byScope = analysis.byScope();
@@ -425,7 +425,7 @@ public class ReportGenerator {
         }
         html.append("</table>");
 
-        // Internal dependencies
+        // Dépendances internes
         List<DependencyInfo> internal = analysis.internalDependencies();
         if (!internal.isEmpty()) {
             html.append("<h2>Internal Dependencies (").append(internal.size()).append(")</h2>");
@@ -440,7 +440,7 @@ public class ReportGenerator {
             html.append("</table>");
         }
 
-        // Unresolved JARs
+        // JARs non résolus
         if (!analysis.unresolved().isEmpty()) {
             html.append("<h2 class='warning'>Unresolved JARs (").append(analysis.unresolved().size()).append(")</h2>");
             html.append("<table><tr><th>JAR</th><th>Size</th><th>SHA1</th><th>Suggested Action</th></tr>");
@@ -454,7 +454,7 @@ public class ReportGenerator {
             html.append("</table>");
         }
 
-        // Project info
+        // Informations du projet
         html.append("<h2>Project Information</h2>");
         html.append("<table>");
         html.append("<tr><th>Property</th><th>Value</th></tr>");
