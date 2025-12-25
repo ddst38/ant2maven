@@ -14,11 +14,18 @@ import java.nio.file.attribute.BasicFileAttributes;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
+import java.util.Enumeration;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipFile;
 
 /**
  * Scanne les fichiers JAR et EAR dans un répertoire de projet.
+ *
+ * Les fichiers EAR (Enterprise Archive) peuvent contenir des bibliothèques JAR,
+ * notamment dans APP-INF/lib/. Ces JARs sont extraits et inclus dans l'analyse.
+ * C'est particulièrement important pour les frameworks WebLogic (modules _W).
  */
 public class JarScanner {
 
@@ -133,5 +140,92 @@ public class JarScanner {
         }
 
         return JarInfo.JarCategory.MAIN;
+    }
+
+    /**
+     * Extrait les fichiers JAR contenus dans un fichier EAR.
+     *
+     * Les fichiers EAR (Enterprise Archive) peuvent contenir des bibliothèques
+     * dans différents emplacements :
+     * - APP-INF/lib/ : bibliothèques partagées de l'application
+     * - lib/ : bibliothèques au niveau racine
+     * - Autres emplacements selon la configuration
+     *
+     * Cette méthode est particulièrement importante pour les frameworks WebLogic
+     * (modules finissant par _W) qui contiennent souvent des dépendances.
+     *
+     * @param earPath Chemin vers le fichier EAR
+     * @param extractDir Répertoire où extraire les JARs
+     * @return Liste des JarInfo extraits
+     */
+    public List<JarInfo> extractJarsFromEar(Path earPath, Path extractDir) throws IOException {
+        List<JarInfo> extractedJars = new ArrayList<>();
+        String earName = earPath.getFileName().toString();
+
+        log.info("Extraction des JARs depuis l'archive EAR : {}", earName);
+
+        try (ZipFile zipFile = new ZipFile(earPath.toFile())) {
+            Enumeration<? extends ZipEntry> entries = zipFile.entries();
+
+            while (entries.hasMoreElements()) {
+                ZipEntry entry = entries.nextElement();
+                String entryName = entry.getName();
+
+                // Chercher les fichiers JAR dans l'EAR
+                if (!entry.isDirectory() && entryName.toLowerCase().endsWith(".jar")) {
+                    // Extraire le JAR
+                    Path targetPath = extractDir.resolve(Path.of(entryName).getFileName());
+
+                    // Éviter les doublons (même nom de fichier)
+                    if (Files.exists(targetPath)) {
+                        // Ajouter le chemin dans l'EAR pour différencier
+                        String uniqueName = entryName.replace("/", "_").replace("\\", "_");
+                        targetPath = extractDir.resolve(uniqueName);
+                    }
+
+                    try (InputStream is = zipFile.getInputStream(entry)) {
+                        Files.createDirectories(targetPath.getParent());
+                        Files.copy(is, targetPath);
+
+                        // Calculer le SHA1 et créer le JarInfo
+                        String sha1 = computeSha1(targetPath);
+                        long size = Files.size(targetPath);
+
+                        JarInfo jarInfo = JarInfo.builder()
+                            .path(targetPath)
+                            .name(targetPath.getFileName().toString())
+                            .size(size)
+                            .sha1(sha1)
+                            .category(JarInfo.JarCategory.MAIN)
+                            .sourceEar(earName)
+                            .build();
+
+                        extractedJars.add(jarInfo);
+
+                        log.debug("Extrait de {} : {} ({})", earName, entryName,
+                            formatSize(size));
+
+                    } catch (Exception e) {
+                        log.warn("Échec de l'extraction de {} depuis {} : {}",
+                            entryName, earName, e.getMessage());
+                    }
+                }
+            }
+        }
+
+        if (!extractedJars.isEmpty()) {
+            log.info("Extrait {} JARs depuis {}", extractedJars.size(), earName);
+        }
+
+        return extractedJars;
+    }
+
+    /**
+     * Formate une taille de fichier en format lisible.
+     */
+    private String formatSize(long bytes) {
+        if (bytes < 1024) return bytes + " B";
+        if (bytes < 1024 * 1024) return String.format("%.1f KB", bytes / 1024.0);
+        return String.format("%.1f MB", bytes / (1024.0 * 1024.0));
     }
 }

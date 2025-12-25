@@ -5,13 +5,18 @@ import java.util.regex.Pattern;
 
 /**
  * Informations sur un fichier JAR découvert dans le projet.
+ *
+ * Le champ sourceEar indique si ce JAR a été extrait d'un fichier EAR.
+ * Les fichiers EAR (Enterprise Archive) peuvent contenir des bibliothèques
+ * dans APP-INF/lib/, particulièrement pour les frameworks WebLogic (modules _W).
  */
 public record JarInfo(
     Path path,
     String name,
     long size,
     String sha1,
-    JarCategory category
+    JarCategory category,
+    String sourceEar  // Nom du fichier EAR source, ou null si JAR direct
 ) {
     public enum JarCategory {
         MAIN,      // Dépendance de compilation principale
@@ -29,12 +34,55 @@ public record JarInfo(
     private static final Pattern JK_SOCLE_PATTERN = Pattern.compile("^jk-socle-.*\\.jar$");
     private static final Pattern S8_PATTERN = Pattern.compile("^s8[a-z]?-.*\\.jar$");
 
+    /**
+     * Crée un JarInfo à partir d'un fichier JAR sur le disque.
+     */
     public static JarInfo of(Path path, long size, String sha1) {
-        return new JarInfo(path, path.getFileName().toString(), size, sha1, JarCategory.UNKNOWN);
+        return new JarInfo(path, path.getFileName().toString(), size, sha1, JarCategory.UNKNOWN, null);
+    }
+
+    /**
+     * Retourne un builder pour construire un JarInfo avec tous les paramètres.
+     */
+    public static Builder builder() {
+        return new Builder();
     }
 
     public JarInfo withCategory(JarCategory newCategory) {
-        return new JarInfo(path, name, size, sha1, newCategory);
+        return new JarInfo(path, name, size, sha1, newCategory, sourceEar);
+    }
+
+    /**
+     * Vérifie si ce JAR provient d'un fichier EAR.
+     */
+    public boolean isFromEar() {
+        return sourceEar != null && !sourceEar.isBlank();
+    }
+
+    /**
+     * Builder pour construire un JarInfo.
+     */
+    public static class Builder {
+        private Path path;
+        private String name;
+        private long size;
+        private String sha1;
+        private JarCategory category = JarCategory.UNKNOWN;
+        private String sourceEar;
+
+        public Builder path(Path path) { this.path = path; return this; }
+        public Builder name(String name) { this.name = name; return this; }
+        public Builder size(long size) { this.size = size; return this; }
+        public Builder sha1(String sha1) { this.sha1 = sha1; return this; }
+        public Builder category(JarCategory category) { this.category = category; return this; }
+        public Builder sourceEar(String sourceEar) { this.sourceEar = sourceEar; return this; }
+
+        public JarInfo build() {
+            if (name == null && path != null) {
+                name = path.getFileName().toString();
+            }
+            return new JarInfo(path, name, size, sha1, category, sourceEar);
+        }
     }
 
     public boolean isSourceJar() {

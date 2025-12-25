@@ -12,7 +12,9 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Stream;
 
 /**
@@ -49,13 +51,34 @@ public class ProjectScanner {
 
         // Trouver tous les JARs et les catégoriser
         List<JarInfo> allJars = jarScanner.findAllJars(projectRoot);
+
+        // Scanner les fichiers EAR pour extraire les JARs qu'ils contiennent
+        // C'est particulièrement important pour les frameworks WebLogic (modules _W)
+        List<JarInfo> jarsFromEars = scanEarFiles(projectRoot, config);
+        if (!jarsFromEars.isEmpty()) {
+            log.info("Ajout de {} JARs extraits depuis des fichiers EAR", jarsFromEars.size());
+            allJars.addAll(jarsFromEars);
+        }
+
         List<JarInfo> mainLibs = new ArrayList<>();
         List<JarInfo> testLibs = new ArrayList<>();
         List<JarInfo> providedLibs = new ArrayList<>();
 
+        // Utiliser un Set pour éviter les doublons basés sur le SHA1
+        Set<String> seenSha1s = new HashSet<>();
+
         for (JarInfo jar : allJars) {
             if (jar.isSourceJar()) {
                 continue; // Ignorer les JARs sources
+            }
+
+            // Éviter les doublons (même SHA1)
+            if (jar.sha1() != null && seenSha1s.contains(jar.sha1())) {
+                log.debug("JAR doublon ignoré (même SHA1) : {}", jar.name());
+                continue;
+            }
+            if (jar.sha1() != null) {
+                seenSha1s.add(jar.sha1());
             }
 
             JarInfo.JarCategory category = jarScanner.categorizeByPath(jar.path(), projectRoot);
@@ -350,5 +373,58 @@ public class ProjectScanner {
         } catch (Exception e) {
             log.warn("Failed to parse weblogic-application.xml: {}", e.getMessage());
         }
+    }
+
+    /**
+     * Scanne les fichiers EAR du projet et extrait les JARs qu'ils contiennent.
+     *
+     * Les fichiers EAR (Enterprise Archive) peuvent contenir des bibliothèques JAR,
+     * notamment dans APP-INF/lib/. C'est particulièrement important pour :
+     * - Les frameworks WebLogic (modules finissant par _W comme R0_W.ear)
+     * - Les répertoires "cadre" ou "framework"
+     *
+     * Les JARs extraits sont placés dans un répertoire temporaire sous le répertoire
+     * de sortie pour permettre leur analyse et leur inclusion dans le projet Maven.
+     *
+     * @param projectRoot Répertoire racine du projet
+     * @param config Configuration de la migration
+     * @return Liste des JarInfo extraits des fichiers EAR
+     */
+    private List<JarInfo> scanEarFiles(Path projectRoot, MigrationConfig config) {
+        List<JarInfo> extractedJars = new ArrayList<>();
+
+        try {
+            // Trouver tous les fichiers EAR dans le projet
+            List<Path> earFiles = jarScanner.findAllEars(projectRoot);
+
+            if (earFiles.isEmpty()) {
+                return extractedJars;
+            }
+
+            // Créer un répertoire temporaire pour l'extraction
+            Path extractDir = config.outputDir().resolve(".ear-extracted");
+            Files.createDirectories(extractDir);
+
+            for (Path earPath : earFiles) {
+                try {
+                    // Extraire les JARs de chaque EAR
+                    List<JarInfo> jarsFromEar = jarScanner.extractJarsFromEar(earPath, extractDir);
+                    extractedJars.addAll(jarsFromEar);
+                } catch (IOException e) {
+                    log.warn("Échec de l'extraction des JARs depuis {} : {}",
+                        earPath.getFileName(), e.getMessage());
+                }
+            }
+
+            if (!extractedJars.isEmpty()) {
+                log.info("Total de {} JARs extraits depuis {} fichiers EAR",
+                    extractedJars.size(), earFiles.size());
+            }
+
+        } catch (IOException e) {
+            log.warn("Erreur lors du scan des fichiers EAR : {}", e.getMessage());
+        }
+
+        return extractedJars;
     }
 }
