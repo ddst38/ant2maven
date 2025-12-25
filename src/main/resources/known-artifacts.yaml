@@ -1,0 +1,341 @@
+# Known artifacts mapping for Ant to Maven migration
+# Format: jarFileName: {groupId, artifactId, version, classifier, scope, note}
+
+knownArtifacts:
+  # Bouncy Castle (version in filename differs from Maven version)
+  bcprov-jdk15on-166.jar:
+    groupId: org.bouncycastle
+    artifactId: bcprov-jdk15on
+    version: "1.66"
+
+  bcpkix-jdk15on-166.jar:
+    groupId: org.bouncycastle
+    artifactId: bcpkix-jdk15on
+    version: "1.66"
+
+  bcmail-jdk15on-166.jar:
+    groupId: org.bouncycastle
+    artifactId: bcmail-jdk15on
+    version: "1.66"
+
+  bcpg-jdk15on-166.jar:
+    groupId: org.bouncycastle
+    artifactId: bcpg-jdk15on
+    version: "1.66"
+
+  bctest-jdk15on-166.jar:
+    groupId: org.bouncycastle
+    artifactId: bctest-jdk15on
+    version: "1.66"
+    scope: test
+
+  bcprov-ext-jdk15on-166.jar:
+    groupId: org.bouncycastle
+    artifactId: bcprov-ext-jdk15on
+    version: "1.66"
+
+  # Spring Framework
+  spring-core-3.2.18.RELEASE.jar:
+    groupId: org.springframework
+    artifactId: spring-core
+    version: 3.2.18.RELEASE
+
+  spring-beans-3.2.18.RELEASE.jar:
+    groupId: org.springframework
+    artifactId: spring-beans
+    version: 3.2.18.RELEASE
+
+  spring-context-3.2.18.RELEASE.jar:
+    groupId: org.springframework
+    artifactId: spring-context
+    version: 3.2.18.RELEASE
+
+  spring-aop-3.2.18.RELEASE.jar:
+    groupId: org.springframework
+    artifactId: spring-aop
+    version: 3.2.18.RELEASE
+
+  spring-expression-3.2.18.RELEASE.jar:
+    groupId: org.springframework
+    artifactId: spring-expression
+    version: 3.2.18.RELEASE
+
+  spring-tx-3.2.18.RELEASE.jar:
+    groupId: org.springframework
+    artifactId: spring-tx
+    version: 3.2.18.RELEASE
+
+  spring-jdbc-3.2.18.RELEASE.jar:
+    groupId: org.springframework
+    artifactId: spring-jdbc
+    version: 3.2.18.RELEASE
+
+  spring-web-3.2.18.RELEASE.jar:
+    groupId: org.springframework
+    artifactId: spring-web
+    version: 3.2.18.RELEASE
+
+  spring-webmvc-3.2.18.RELEASE.jar:
+    groupId: org.springframework
+    artifactId: spring-webmvc
+    version: 3.2.18.RELEASE
+
+  spring-test-3.2.18.RELEASE.jar:
+    groupId: org.springframework
+    artifactId: spring-test
+    version: 3.2.18.RELEASE
+    scope: test
+
+  # AspectJ
+  aspectjrt-1.8.9.jar:
+    groupId: org.aspectj
+    artifactId: aspectjrt
+    version: 1.8.9
+
+  aspectjweaver-1.8.9.jar:
+    groupId: org.aspectj
+    artifactId: aspectjweaver
+    version: 1.8.9
+
+  # Log4j 2
+  log4j-api-2.17.1.jar:
+    groupId: org.apache.logging.log4j
+    artifactId: log4j-api
+    version: 2.17.1
+
+  log4j-core-2.17.1.jar:
+    groupId: org.apache.logging.log4j
+    artifactId: log4j-core
+    version: 2.17.1
+
+  log4j-1.2-api-2.17.1.jar:
+    groupId: org.apache.logging.log4j
+    artifactId: log4j-1.2-api
+    version: 2.17.1
+
+  log4j-slf4j-impl-2.17.1.jar:
+    groupId: org.apache.logging.log4j
+    artifactId: log4j-slf4j-impl
+    version: 2.17.1
+
+  # SLF4J
+  slf4j-api-1.7.30.jar:
+    groupId: org.slf4j
+    artifactId: slf4j-api
+    version: 1.7.30
+
+  # Commons
+  commons-lang-2.6.jar:
+    groupId: commons-lang
+    artifactId: commons-lang
+    version: 2.6
+
+  commons-lang3-3.8.1.jar:
+    groupId: org.apache.commons
+    artifactId: commons-lang3
+    version: 3.8.1
+
+  commons-collections-3.2.1.jar:
+    groupId: commons-collections
+    artifactId: commons-collections
+    version: 3.2.1
+
+  commons-collections4-4.1.jar:
+    groupId: org.apache.commons
+    artifactId: commons-collections4
+    version: 4.1
+
+  commons-codec-1.3.jar:
+    groupId: commons-codec
+    artifactId: commons-codec
+    version: "1.3"
+
+  commons-codec-1.9.jar:
+    groupId: commons-codec
+    artifactId: commons-codec
+    version: "1.9"
+
+  commons-logging-1.1.1.jar:
+    groupId: commons-logging
+    artifactId: commons-logging
+    version: 1.1.1
+
+  commons-logging-1.1.3.jar:
+    groupId: commons-logging
+    artifactId: commons-logging
+    version: 1.1.3
+
+  commons-beanutils-1.9.1.jar:
+    groupId: commons-beanutils
+    artifactId: commons-beanutils
+    version: 1.9.1
+
+  commons-beanutils-1.9.3.jar:
+    groupId: commons-beanutils
+    artifactId: commons-beanutils
+    version: 1.9.3
+
+  commons-configuration-1.10.jar:
+    groupId: commons-configuration
+    artifactId: commons-configuration
+    version: "1.10"
+
+  commons-configuration2-2.4.jar:
+    groupId: org.apache.commons
+    artifactId: commons-configuration2
+    version: 2.4
+
+  commons-text-1.6.jar:
+    groupId: org.apache.commons
+    artifactId: commons-text
+    version: 1.6
+
+  commons-io-2.4.jar:
+    groupId: commons-io
+    artifactId: commons-io
+    version: 2.4
+
+  commons-pool-1.3.jar:
+    groupId: commons-pool
+    artifactId: commons-pool
+    version: "1.3"
+
+  commons-dbcp-1.4.jar:
+    groupId: commons-dbcp
+    artifactId: commons-dbcp
+    version: 1.4
+
+  # Jackson
+  jackson-core-2.9.4.jar:
+    groupId: com.fasterxml.jackson.core
+    artifactId: jackson-core
+    version: 2.9.4
+
+  jackson-databind-2.9.4.jar:
+    groupId: com.fasterxml.jackson.core
+    artifactId: jackson-databind
+    version: 2.9.4
+
+  jackson-annotations-2.9.0.jar:
+    groupId: com.fasterxml.jackson.core
+    artifactId: jackson-annotations
+    version: 2.9.0
+
+  jackson-core-asl-1.9.13.jar:
+    groupId: org.codehaus.jackson
+    artifactId: jackson-core-asl
+    version: 1.9.13
+
+  jackson-mapper-asl-1.9.13.jar:
+    groupId: org.codehaus.jackson
+    artifactId: jackson-mapper-asl
+    version: 1.9.13
+
+  # PostgreSQL
+  postgresql-42.2.5.jar:
+    groupId: org.postgresql
+    artifactId: postgresql
+    version: 42.2.5
+
+  # Joda Time
+  joda-time-2.3.jar:
+    groupId: joda-time
+    artifactId: joda-time
+    version: 2.3
+
+  # Metrics
+  metrics-core-3.0.2.jar:
+    groupId: io.dropwizard.metrics
+    artifactId: metrics-core
+    version: 3.0.2
+
+  # AOP Alliance
+  aopalliance-1.0.jar:
+    groupId: aopalliance
+    artifactId: aopalliance
+    version: "1.0"
+
+  # JAXB / JAX-WS
+  jaxb-api-2.3.0.jar:
+    groupId: javax.xml.bind
+    artifactId: jaxb-api
+    version: 2.3.0
+
+  jaxws-api-2.3.0.jar:
+    groupId: javax.xml.ws
+    artifactId: jaxws-api
+    version: 2.3.0
+
+  # Tomcat JDBC Pool
+  tomcat-jdbc-7.0.54.jar:
+    groupId: org.apache.tomcat
+    artifactId: tomcat-jdbc
+    version: 7.0.54
+
+  tomcat-juli-7.0.54.jar:
+    groupId: org.apache.tomcat
+    artifactId: tomcat-juli
+    version: 7.0.54
+
+  # Test Libraries
+  junit-4.11.jar:
+    groupId: junit
+    artifactId: junit
+    version: 4.11
+    scope: test
+
+  mockito-all-1.9.0.jar:
+    groupId: org.mockito
+    artifactId: mockito-all
+    version: 1.9.0
+    scope: test
+
+  hamcrest-core-1.3.jar:
+    groupId: org.hamcrest
+    artifactId: hamcrest-core
+    version: 1.3
+    scope: test
+
+  dbunit-2.5.0.jar:
+    groupId: org.dbunit
+    artifactId: dbunit
+    version: 2.5.0
+    scope: test
+
+  h2-1.3.173.jar:
+    groupId: com.h2database
+    artifactId: h2
+    version: 1.3.173
+    scope: test
+
+  assertj-core-1.5.0.jar:
+    groupId: org.assertj
+    artifactId: assertj-core
+    version: 1.5.0
+    scope: test
+
+  spring-test-dbunit-1.2.1.jar:
+    groupId: com.github.springtestdbunit
+    artifactId: spring-test-dbunit
+    version: 1.2.1
+    scope: test
+
+  springockito-annotations-1.0.9.jar:
+    groupId: org.kubek2k
+    artifactId: springockito-annotations
+    version: 1.0.9
+    scope: test
+
+  # Oracle JDBC (requires manual download)
+  classes12.jar:
+    groupId: com.oracle.database.jdbc
+    artifactId: ojdbc8
+    version: 12.2.0.1
+    scope: provided
+    note: "Oracle JDBC - requires manual download from Oracle"
+
+  # Struts 1.x (legacy)
+  struts.jar:
+    groupId: org.apache.struts
+    artifactId: struts-core
+    version: 1.3.10
