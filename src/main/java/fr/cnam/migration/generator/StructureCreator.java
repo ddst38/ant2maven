@@ -160,31 +160,21 @@ public class StructureCreator {
     /**
      * Copie les JARs internes vers le répertoire liblocale.
      *
-     * Les noms de JARs sont nettoyés pour supprimer les préfixes DEPFAB. et les codes projet.
-     * Le préfixe DEPFAB. indique une dépendance de fabrication qui était fournie par l'IC ANT.
+     * IMPORTANT: Cette méthode ne copie plus automatiquement les JARs basés sur
+     * isInternalArtifact() car cela ne tient pas compte des coordonnées Maven résolues.
+     * Par exemple, struts.jar a isInternalArtifact()=true mais ses coordonnées sont
+     * org.apache.struts:struts-core qui est disponible sur Maven Central.
      *
-     * Exemples de nettoyage :
-     * - DEPFAB.W1_ServiceImageDecompte_v1.0_client.jar → W1_ServiceImageDecompte_v1.0_client.jar
-     * - DEPFAB.S8_J.nimbus-jose-jwt-4.23-jdk16.jar → nimbus-jose-jwt-4.23-jdk16.jar
+     * Les JARs à copier sont maintenant déterminés par l'analyse des dépendances
+     * via copyInternalResolvedJars() et copyUnresolvedJars().
+     *
+     * Les noms de JARs sont nettoyés pour supprimer les préfixes DEPFAB. et les codes projet.
      */
     private void copyInternalJars(ProjectStructure project, Path liblocale) throws IOException {
-        int count = 0;
-        int cleaned = 0;
-        for (var jar : project.allJars()) {
-            if (jar.isInternalArtifact() && Files.exists(jar.path())) {
-                // Nettoyer le nom du JAR (supprimer DEPFAB. et code projet si présents)
-                String cleanedName = JarNameCleaner.clean(jar.name());
-
-                if (!cleanedName.equals(jar.name())) {
-                    cleaned++;
-                }
-
-                Files.copy(jar.path(), liblocale.resolve(cleanedName),
-                    StandardCopyOption.REPLACE_EXISTING);
-                count++;
-            }
-        }
-        log.info("Copié {} JARs internes vers liblocale ({} noms nettoyés)", count, cleaned);
+        // Ne copie plus automatiquement les JARs ici.
+        // La copie est maintenant gérée par copyInternalResolvedJars() et copyUnresolvedJars()
+        // qui tiennent compte des coordonnées Maven résolues.
+        log.debug("copyInternalJars: les JARs seront copiés via copyInternalResolvedJars/copyUnresolvedJars");
     }
 
     /**
@@ -251,9 +241,9 @@ public class StructureCreator {
     /**
      * Copie les JARs des dépendances internes résolues vers le répertoire liblocale.
      *
-     * Ces JARs ont été résolus via known-artifacts.yaml ou les patterns internes,
-     * mais ils doivent quand même être installés localement car ils ne sont pas
-     * disponibles sur Maven Central.
+     * Seuls les JARs dont les coordonnées Maven commencent par fr.cnamts ou fr.cnam
+     * sont copiés. Les JARs avec des coordonnées Maven Central (org.apache.*, com.*, etc.)
+     * ne sont PAS copiés car ils seront téléchargés automatiquement par Maven.
      *
      * @param analysis Résultat de l'analyse des dépendances
      * @param outputDir Répertoire de sortie du projet Maven
@@ -273,6 +263,9 @@ public class StructureCreator {
         }
 
         int count = 0;
+        int skippedExternal = 0;
+
+        // Copier uniquement les dépendances internes (fr.cnamts.* ou fr.cnam.*)
         for (DependencyInfo dep : analysis.internalDependencies()) {
             JarInfo jar = dep.sourceJar();
 
@@ -296,9 +289,11 @@ public class StructureCreator {
             count++;
 
             if (!cleanedName.equals(jar.name())) {
-                log.info("Copié JAR interne résolu : {} → {}", jar.name(), cleanedName);
+                log.info("Copié JAR interne résolu : {} → {} ({}:{}:{})",
+                    jar.name(), cleanedName, dep.groupId(), dep.artifactId(), dep.version());
             } else {
-                log.info("Copié JAR interne résolu : {}", cleanedName);
+                log.info("Copié JAR interne résolu : {} ({}:{}:{})",
+                    cleanedName, dep.groupId(), dep.artifactId(), dep.version());
             }
         }
 

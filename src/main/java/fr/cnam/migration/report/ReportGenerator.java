@@ -89,47 +89,42 @@ public class ReportGenerator {
 
     /**
      * Génère le script install-local-jars.sh pour le mode de déploiement LOCAL.
-     * Utilise le versionnement basé sur SHA pour les JARs sans version détectable.
+     *
+     * IMPORTANT: Les coordonnées Maven utilisées dans ce script DOIVENT correspondre
+     * exactement à celles déclarées dans le pom.xml du module WAR. Sinon Maven ne
+     * pourra pas résoudre les dépendances.
      *
      * Les noms de fichiers sont nettoyés (suppression de DEPFAB. et codes projet)
      * pour correspondre aux fichiers copiés dans liblocale.
      */
     public void generateInstallScript(AnalysisResult analysis, Path outputDir,
                                       JarVersionExtractor versionExtractor) throws IOException {
-        List<Map<String, String>> internalJars = new ArrayList<>();
+        List<Map<String, String>> jarsToInstall = new ArrayList<>();
         String basePackage = config != null ? config.basePackage() : MigrationConfig.DEFAULT_BASE_PACKAGE;
 
-        // Collecter les dépendances internes
+        // 1. Collecter les dépendances internes résolues
+        // Ces JARs utilisent les MÊMES coordonnées que dans le pom.xml
         for (DependencyInfo dep : analysis.internalDependencies()) {
             JarInfo jar = dep.sourceJar();
-
-            // Extraire les infos de version, en utilisant SHA si nécessaire
-            JarVersionExtractor.VersionInfo versionInfo = versionExtractor.extractVersion(jar);
-
-            String version = versionInfo.version();
-            String artifactId = versionInfo.artifactName();
-
-            // Si basé sur SHA, utiliser l'ID d'artefact basé sur SHA pour éviter les collisions
-            if (versionInfo.isShaBasedVersion() && jar.sha1() != null) {
-                artifactId = versionExtractor.generateShaBasedArtifactId(jar.name(), jar.sha1());
-            }
 
             // Nettoyer le nom du fichier (supprimer DEPFAB. et code projet)
             String cleanedFileName = JarNameCleaner.clean(jar.name());
 
-            internalJars.add(Map.of(
+            // Utiliser les MÊMES coordonnées que dans le pom.xml
+            // C'est crucial pour que Maven puisse résoudre les dépendances
+            jarsToInstall.add(Map.of(
                 "originalName", jar.name(),
                 "fileName", cleanedFileName,
                 "groupId", dep.groupId(),
-                "artifactId", artifactId,
-                "version", version,
-                "versionSource", versionInfo.source().getDescription(),
-                "isShaBasedVersion", String.valueOf(versionInfo.isShaBasedVersion())
+                "artifactId", dep.artifactId(),
+                "version", dep.version(),
+                "versionSource", dep.method().getDescription(),
+                "isInternal", "true"
             ));
         }
 
-        // Inclure TOUS les JARs non résolus (pas seulement les internes)
-        // Ces JARs doivent être installés pour permettre la compilation
+        // 2. Collecter les JARs non résolus
+        // Ces JARs utilisent les coordonnées générées (basePackage.unresolved:artifactName:LOCAL)
         for (AnalysisResult.UnresolvedJar unresolved : analysis.unresolved()) {
             JarInfo jar = unresolved.jar();
 
@@ -137,43 +132,15 @@ public class ReportGenerator {
             String cleanedFileName = JarNameCleaner.clean(jar.name());
             String artifactName = cleanedFileName.replace(".jar", "");
 
-            // Utiliser les mêmes coordonnées que dans le pom.xml généré
-            String groupId;
-            String artifactId;
-            String version;
-            String versionSource;
-            boolean isShaBasedVersion = false;
-
-            if (jar.isInternalArtifact()) {
-                // Pour les JARs internes, utiliser les patterns internes
-                JarVersionExtractor.VersionInfo versionInfo = versionExtractor.extractVersion(jar);
-                version = versionInfo.version();
-                artifactId = versionInfo.artifactName();
-                versionSource = versionInfo.source().getDescription();
-                isShaBasedVersion = versionInfo.isShaBasedVersion();
-
-                if (isShaBasedVersion && jar.sha1() != null) {
-                    artifactId = versionExtractor.generateShaBasedArtifactId(jar.name(), jar.sha1());
-                }
-
-                var coord = internalPatterns.resolve(jar);
-                groupId = coord.map(MavenCoordinate::groupId).orElse(basePackage + ".internal");
-            } else {
-                // Pour les autres JARs non résolus, utiliser le groupe "unresolved"
-                groupId = basePackage + ".unresolved";
-                artifactId = artifactName;
-                version = "LOCAL";
-                versionSource = "Non résolu - coordonnées générées";
-            }
-
-            internalJars.add(Map.of(
+            // Utiliser les MÊMES coordonnées que dans le pom.xml
+            jarsToInstall.add(Map.of(
                 "originalName", jar.name(),
                 "fileName", cleanedFileName,
-                "groupId", groupId,
-                "artifactId", artifactId,
-                "version", version,
-                "versionSource", versionSource,
-                "isShaBasedVersion", String.valueOf(isShaBasedVersion)
+                "groupId", basePackage + ".unresolved",
+                "artifactId", artifactName,
+                "version", "LOCAL",
+                "versionSource", "Non résolu - coordonnées générées",
+                "isInternal", "false"
             ));
         }
 
@@ -183,34 +150,33 @@ public class ReportGenerator {
 
         StringBuilder script = new StringBuilder();
         script.append("#!/bin/bash\n");
-        script.append("# Installation des JARs internes dans le repository Maven local (.m2)\n");
+        script.append("# Installation des JARs dans le repository Maven local (.m2)\n");
         script.append("# Généré par ant2maven le ").append(LocalDateTime.now().format(
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))).append("\n");
         script.append("#\n");
-        script.append("# Les JARs avec versions basées sur SHA sont marqués [SHA]\n");
-        script.append("# Cela évite les collisions de version quand différents projets ont\n");
-        script.append("# différentes versions du même JAR non versionné.\n");
+        script.append("# Ce script installe les JARs qui ne sont pas disponibles sur Maven Central.\n");
+        script.append("# Les coordonnées Maven correspondent EXACTEMENT à celles du pom.xml.\n");
         script.append("#\n");
         script.append("# Note: Les préfixes DEPFAB. et codes projet ont été supprimés des noms de fichiers.\n");
         script.append("\n");
         script.append("set -e\n");
         script.append("cd \"$(dirname \"$0\")\"\n");
         script.append("\n");
-        script.append("echo \"Installation des JARs internes dans le repository Maven local...\"\n");
+        script.append("echo \"Installation des JARs dans le repository Maven local...\"\n");
         script.append("\n");
 
-        for (Map<String, String> jar : internalJars) {
-            String shaMarker = "true".equals(jar.get("isShaBasedVersion")) ? " [SHA]" : "";
+        for (Map<String, String> jar : jarsToInstall) {
             String originalName = jar.get("originalName");
             String fileName = jar.get("fileName");
+            String typeMarker = "true".equals(jar.get("isInternal")) ? "[Interne]" : "[Non résolu]";
 
             // Afficher le nom original si différent du nom nettoyé
             if (!originalName.equals(fileName)) {
-                script.append("# ").append(originalName).append(" -> ").append(fileName).append(shaMarker).append("\n");
+                script.append("# ").append(typeMarker).append(" ").append(originalName).append(" -> ").append(fileName).append("\n");
             } else {
-                script.append("# ").append(fileName).append(shaMarker).append("\n");
+                script.append("# ").append(typeMarker).append(" ").append(fileName).append("\n");
             }
-            script.append("# Source version: ").append(jar.get("versionSource")).append("\n");
+            script.append("# Source: ").append(jar.get("versionSource")).append("\n");
             script.append("mvn install:install-file \\\n");
             script.append("    -Dfile=\"").append(fileName).append("\" \\\n");
             script.append("    -DgroupId=\"").append(jar.get("groupId")).append("\" \\\n");
@@ -220,13 +186,13 @@ public class ReportGenerator {
             script.append("\n");
         }
 
-        script.append("echo \"Terminé ! ").append(internalJars.size()).append(" JARs installés.\"\n");
+        script.append("echo \"Terminé ! ").append(jarsToInstall.size()).append(" JARs installés.\"\n");
 
         Path scriptFile = scriptDir.resolve("install-local-jars.sh");
         Files.writeString(scriptFile, script.toString());
         scriptFile.toFile().setExecutable(true);
 
-        log.info("Script install-local-jars.sh généré pour {} JARs", internalJars.size());
+        log.info("Script install-local-jars.sh généré pour {} JARs", jarsToInstall.size());
     }
 
     /**
@@ -238,7 +204,9 @@ public class ReportGenerator {
 
     /**
      * Génère le script deploy-to-artifactory.sh pour le mode de déploiement REMOTE.
-     * Utilise le versionnement basé sur SHA pour les JARs sans version détectable.
+     *
+     * IMPORTANT: Les coordonnées Maven utilisées dans ce script DOIVENT correspondre
+     * exactement à celles déclarées dans le pom.xml du module WAR.
      *
      * Les noms de fichiers sont nettoyés (suppression de DEPFAB. et codes projet)
      * pour correspondre aux fichiers copiés dans liblocale.
@@ -254,23 +222,15 @@ public class ReportGenerator {
         List<Map<String, String>> deployableJars = new ArrayList<>();
         String basePackage = config.basePackage();
 
-        // Collecter les dépendances internes à déployer
+        // 1. Collecter les dépendances internes résolues
+        // Utiliser les MÊMES coordonnées que dans le pom.xml
         for (DependencyInfo dep : analysis.internalDependencies()) {
             JarInfo jar = dep.sourceJar();
-            JarVersionExtractor.VersionInfo versionInfo = versionExtractor.extractVersion(jar);
-
-            String version = versionInfo.version();
-            String artifactId = versionInfo.artifactName();
-
-            // Utiliser l'ID d'artefact basé sur SHA pour les JARs non versionnés
-            if (versionInfo.isShaBasedVersion() && jar.sha1() != null) {
-                artifactId = versionExtractor.generateShaBasedArtifactId(jar.name(), jar.sha1());
-            }
-
-            MavenCoordinate coord = new MavenCoordinate(dep.groupId(), artifactId, version);
 
             // Nettoyer le nom du fichier (supprimer DEPFAB. et code projet)
             String cleanedFileName = JarNameCleaner.clean(jar.name());
+
+            MavenCoordinate coord = dep.coordinate();
 
             deployableJars.add(Map.of(
                 "originalName", jar.name(),
@@ -279,13 +239,14 @@ public class ReportGenerator {
                 "groupId", coord.groupId(),
                 "artifactId", coord.artifactId(),
                 "version", coord.version(),
-                "versionSource", versionInfo.source().getDescription(),
-                "isShaBasedVersion", String.valueOf(versionInfo.isShaBasedVersion()),
+                "versionSource", dep.method().getDescription(),
+                "isInternal", "true",
                 "deployCommand", artifactoryClient.generateDeployCommand(jar.path(), coord, false)
             ));
         }
 
-        // Inclure TOUS les JARs non résolus (pas seulement les internes)
+        // 2. Collecter les JARs non résolus
+        // Utiliser les MÊMES coordonnées que dans le pom.xml
         for (AnalysisResult.UnresolvedJar unresolved : analysis.unresolved()) {
             JarInfo jar = unresolved.jar();
 
@@ -293,35 +254,11 @@ public class ReportGenerator {
             String cleanedFileName = JarNameCleaner.clean(jar.name());
             String artifactName = cleanedFileName.replace(".jar", "");
 
-            String groupId;
-            String artifactId;
-            String version;
-            String versionSource;
-            boolean isShaBasedVersion = false;
-
-            if (jar.isInternalArtifact()) {
-                // Pour les JARs internes, utiliser les patterns internes
-                JarVersionExtractor.VersionInfo versionInfo = versionExtractor.extractVersion(jar);
-                version = versionInfo.version();
-                artifactId = versionInfo.artifactName();
-                versionSource = versionInfo.source().getDescription();
-                isShaBasedVersion = versionInfo.isShaBasedVersion();
-
-                if (isShaBasedVersion && jar.sha1() != null) {
-                    artifactId = versionExtractor.generateShaBasedArtifactId(jar.name(), jar.sha1());
-                }
-
-                var patternCoord = internalPatterns.resolve(jar);
-                groupId = patternCoord.map(MavenCoordinate::groupId).orElse(basePackage + ".internal");
-            } else {
-                // Pour les autres JARs non résolus, utiliser le groupe "unresolved"
-                groupId = basePackage + ".unresolved";
-                artifactId = artifactName;
-                version = "LOCAL";
-                versionSource = "Non résolu - coordonnées générées";
-            }
-
-            MavenCoordinate coord = new MavenCoordinate(groupId, artifactId, version);
+            MavenCoordinate coord = new MavenCoordinate(
+                basePackage + ".unresolved",
+                artifactName,
+                "LOCAL"
+            );
 
             deployableJars.add(Map.of(
                 "originalName", jar.name(),
@@ -330,8 +267,8 @@ public class ReportGenerator {
                 "groupId", coord.groupId(),
                 "artifactId", coord.artifactId(),
                 "version", coord.version(),
-                "versionSource", versionSource,
-                "isShaBasedVersion", String.valueOf(isShaBasedVersion),
+                "versionSource", "Non résolu - coordonnées générées",
+                "isInternal", "false",
                 "deployCommand", artifactoryClient.generateDeployCommand(jar.path(), coord, false)
             ));
         }
@@ -342,16 +279,14 @@ public class ReportGenerator {
 
         StringBuilder script = new StringBuilder();
         script.append("#!/bin/bash\n");
-        script.append("# Déploiement des JARs internes vers Artifactory\n");
+        script.append("# Déploiement des JARs vers Artifactory\n");
         script.append("# Généré par ant2maven le ").append(LocalDateTime.now().format(
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))).append("\n");
         script.append("#\n");
         script.append("# Artifactory: ").append(config.artifactoryUrl()).append("\n");
         script.append("# Repository Release: ").append(config.artifactoryReleaseRepo()).append("\n");
         script.append("#\n");
-        script.append("# Les JARs avec versions basées sur SHA sont marqués [SHA]\n");
-        script.append("# Cela évite les collisions de version quand différents projets ont\n");
-        script.append("# différentes versions du même JAR non versionné.\n");
+        script.append("# Les coordonnées Maven correspondent EXACTEMENT à celles du pom.xml.\n");
         script.append("#\n");
         script.append("# Note: Les préfixes DEPFAB. et codes projet ont été supprimés des noms de fichiers.\n");
         script.append("#\n");
@@ -366,23 +301,23 @@ public class ReportGenerator {
         script.append("    exit 1\n");
         script.append("fi\n");
         script.append("\n");
-        script.append("echo \"Déploiement des JARs internes vers Artifactory...\"\n");
+        script.append("echo \"Déploiement des JARs vers Artifactory...\"\n");
         script.append("echo \"Cible: ").append(config.artifactoryUrl()).append("/")
                .append(config.artifactoryReleaseRepo()).append("\"\n");
         script.append("\n");
 
         for (Map<String, String> jar : deployableJars) {
-            String shaMarker = "true".equals(jar.get("isShaBasedVersion")) ? " [SHA]" : "";
+            String typeMarker = "true".equals(jar.get("isInternal")) ? "[Interne]" : "[Non résolu]";
             String originalName = jar.get("originalName");
             String fileName = jar.get("fileName");
 
             // Afficher le nom original si différent du nom nettoyé
             if (!originalName.equals(fileName)) {
-                script.append("# ").append(originalName).append(" -> ").append(fileName).append(shaMarker).append("\n");
+                script.append("# ").append(typeMarker).append(" ").append(originalName).append(" -> ").append(fileName).append("\n");
             } else {
-                script.append("# ").append(fileName).append(shaMarker).append("\n");
+                script.append("# ").append(typeMarker).append(" ").append(fileName).append("\n");
             }
-            script.append("# Source version: ").append(jar.get("versionSource")).append("\n");
+            script.append("# Source: ").append(jar.get("versionSource")).append("\n");
             script.append("# Coordonnée: ").append(jar.get("groupId")).append(":")
                    .append(jar.get("artifactId")).append(":").append(jar.get("version")).append("\n");
             script.append("echo \"Déploiement de ").append(fileName).append("...\"\n");
@@ -501,16 +436,41 @@ public class ReportGenerator {
         }
         html.append("</table>");
 
-        // Dépendances internes
+        // Section: TOUTES les dépendances résolues (externes + internes)
+        html.append("<h2>Toutes les dépendances résolues (").append(analysis.resolved().size()).append(")</h2>");
+        html.append("<p><em>Ces dépendances seront déclarées dans le pom.xml du module WAR.</em></p>");
+
+        // Dépendances externes (Maven Central)
+        List<DependencyInfo> external = analysis.externalDependencies();
+        if (!external.isEmpty()) {
+            html.append("<h3 class='success'>Dépendances externes - Maven Central (").append(external.size()).append(")</h3>");
+            html.append("<p><em>Ces bibliothèques seront téléchargées automatiquement par Maven.</em></p>");
+            html.append("<table><tr><th>JAR d'origine</th><th>Coordonnées Maven</th><th>Méthode de résolution</th></tr>");
+            for (DependencyInfo dep : external) {
+                String originalName = dep.sourceJar().name();
+                String cleanedName = JarNameCleaner.clean(originalName);
+                String displayName = originalName.equals(cleanedName) ? originalName : originalName + " → " + cleanedName;
+
+                html.append("<tr><td>").append(displayName).append("</td>");
+                html.append("<td><code>").append(dep.coordinate().toGav()).append("</code></td>");
+                html.append("<td>").append(dep.method().getDescription()).append("</td></tr>");
+            }
+            html.append("</table>");
+        }
+
+        // Dépendances internes (fr.cnamts.*)
         List<DependencyInfo> internal = analysis.internalDependencies();
         if (!internal.isEmpty()) {
-            html.append("<h2>Internal Dependencies (").append(internal.size()).append(")</h2>");
-            html.append("<p><em>Note: Rows highlighted in yellow use SHA-based versioning to prevent collisions.</em></p>");
-            html.append("<table><tr><th>JAR</th><th>Maven Coordinate</th><th>Version Source</th></tr>");
+            html.append("<h3 class='warning'>Dépendances internes - Installation locale requise (").append(internal.size()).append(")</h3>");
+            html.append("<p><em>Ces bibliothèques doivent être installées via <code>./liblocale/install-local-jars.sh</code></em></p>");
+            html.append("<table><tr><th>JAR d'origine</th><th>Coordonnées Maven</th><th>Méthode de résolution</th></tr>");
             for (DependencyInfo dep : internal) {
-                String rowClass = dep.version().startsWith("SHA-") ? " class='sha-version'" : "";
-                html.append("<tr").append(rowClass).append("><td>").append(dep.sourceJar().name()).append("</td>");
-                html.append("<td>").append(dep.coordinate().toGav()).append("</td>");
+                String originalName = dep.sourceJar().name();
+                String cleanedName = JarNameCleaner.clean(originalName);
+                String displayName = originalName.equals(cleanedName) ? originalName : originalName + " → " + cleanedName;
+
+                html.append("<tr><td>").append(displayName).append("</td>");
+                html.append("<td><code>").append(dep.coordinate().toGav()).append("</code></td>");
                 html.append("<td>").append(dep.method().getDescription()).append("</td></tr>");
             }
             html.append("</table>");
@@ -518,13 +478,20 @@ public class ReportGenerator {
 
         // JARs non résolus
         if (!analysis.unresolved().isEmpty()) {
-            html.append("<h2 class='warning'>Unresolved JARs (").append(analysis.unresolved().size()).append(")</h2>");
-            html.append("<table><tr><th>JAR</th><th>Size</th><th>SHA1</th><th>Suggested Action</th></tr>");
+            html.append("<h3 class='error'>JARs non résolus - Installation locale requise (").append(analysis.unresolved().size()).append(")</h3>");
+            html.append("<p><em>Ces bibliothèques n'ont pas pu être identifiées. Elles seront installées avec des coordonnées générées.</em></p>");
+            html.append("<table><tr><th>JAR d'origine</th><th>Coordonnées générées</th><th>Taille</th><th>Action suggérée</th></tr>");
+            String basePackage = config != null ? config.basePackage() : MigrationConfig.DEFAULT_BASE_PACKAGE;
             for (AnalysisResult.UnresolvedJar unresolved : analysis.unresolved()) {
                 JarInfo jar = unresolved.jar();
-                html.append("<tr><td>").append(jar.name()).append("</td>");
+                String originalName = jar.name();
+                String cleanedName = JarNameCleaner.clean(originalName);
+                String displayName = originalName.equals(cleanedName) ? originalName : originalName + " → " + cleanedName;
+                String artifactName = cleanedName.replace(".jar", "");
+
+                html.append("<tr><td>").append(displayName).append("</td>");
+                html.append("<td><code>").append(basePackage).append(".unresolved:").append(artifactName).append(":LOCAL</code></td>");
                 html.append("<td>").append(formatSize(jar.size())).append("</td>");
-                html.append("<td><code>").append(jar.sha1() != null ? jar.sha1().substring(0, 12) + "..." : "N/A").append("</code></td>");
                 html.append("<td>").append(suggestAction(jar)).append("</td></tr>");
             }
             html.append("</table>");

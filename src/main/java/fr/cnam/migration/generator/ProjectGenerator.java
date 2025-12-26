@@ -116,6 +116,10 @@ public class ProjectGenerator {
 
     /**
      * Génère le POM du module WAR.
+     *
+     * IMPORTANT: Toutes les dépendances (résolues et non résolues) doivent être
+     * déclarées ici pour que le projet compile. Les dépendances internes seront
+     * installées via le script install-local-jars.sh.
      */
     private Path generateWarPom(ProjectStructure project, AnalysisResult analysis,
                                 Path webModuleDir) {
@@ -132,29 +136,39 @@ public class ProjectGenerator {
         model.put("warName", project.primaryBuild() != null ?
             project.primaryBuild().warName().replace(".war", "") : moduleName);
 
-        // Dépendances résolues
+        // Collecter TOUTES les dépendances (résolues + non résolues)
         List<Map<String, String>> dependencies = new ArrayList<>();
+        String basePackage = config.basePackage();
+
+        log.info("Génération des dépendances pour le pom.xml du module WAR");
+        log.info("  - {} dépendances résolues", analysis.resolved().size());
+        log.info("  - {} dépendances non résolues", analysis.unresolved().size());
+
+        // 1. Dépendances résolues (internes ET externes)
         for (DependencyInfo dep : analysis.resolved()) {
             if (dep.scope() != Scope.TEST || config.isPicBuild()) {
                 Map<String, String> depMap = new LinkedHashMap<>();
                 depMap.put("groupId", dep.groupId());
                 depMap.put("artifactId", dep.artifactId());
-                // Utiliser une référence de propriété ou version directe
-                if (shouldUsePropertyVersion(dep)) {
-                    depMap.put("version", null); // Sera géré par le parent
-                } else {
-                    depMap.put("version", dep.version());
-                }
+                depMap.put("version", dep.version());
+
                 if (dep.scope() != Scope.COMPILE) {
                     depMap.put("scope", dep.scope().getValue());
                 }
+
+                // Marquer les dépendances internes qui nécessitent installation locale
+                if (dep.isInternal()) {
+                    depMap.put("comment", "Interne - installer via ./liblocale/install-local-jars.sh");
+                    log.debug("  Dépendance interne: {}:{}:{}", dep.groupId(), dep.artifactId(), dep.version());
+                } else {
+                    log.debug("  Dépendance externe: {}:{}:{}", dep.groupId(), dep.artifactId(), dep.version());
+                }
+
                 dependencies.add(depMap);
             }
         }
 
-        // Ajouter les dépendances non résolues (seront installées via install-local-jars.sh)
-        // Ces dépendances utilisent des coordonnées générées basées sur le nom du JAR
-        String basePackage = config.basePackage();
+        // 2. Dépendances non résolues (seront installées via install-local-jars.sh)
         for (AnalysisResult.UnresolvedJar unresolved : analysis.unresolved()) {
             JarInfo jar = unresolved.jar();
             Map<String, String> depMap = new LinkedHashMap<>();
@@ -168,8 +182,12 @@ public class ProjectGenerator {
             depMap.put("version", "LOCAL");
             depMap.put("comment", "Non résolu - installer via ./liblocale/install-local-jars.sh");
 
+            log.debug("  Dépendance non résolue: {}.unresolved:{}:LOCAL", basePackage, artifactName);
+
             dependencies.add(depMap);
         }
+
+        log.info("Total: {} dépendances à déclarer dans le pom.xml", dependencies.size());
 
         model.put("dependencies", dependencies);
 

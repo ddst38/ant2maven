@@ -12,9 +12,9 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Set;
+import java.util.Map;
 import java.util.stream.Stream;
 
 /**
@@ -64,30 +64,58 @@ public class ProjectScanner {
         List<JarInfo> testLibs = new ArrayList<>();
         List<JarInfo> providedLibs = new ArrayList<>();
 
-        // Utiliser un Set pour éviter les doublons basés sur le SHA1
-        Set<String> seenSha1s = new HashSet<>();
+        // Utiliser un Map pour éviter les doublons basés sur le SHA1
+        // En cas de doublon, on garde celui avec la meilleure catégorie (MAIN > PROVIDED > TEST)
+        Map<String, JarInfo> bestByHash = new LinkedHashMap<>();
 
         for (JarInfo jar : allJars) {
             if (jar.isSourceJar()) {
                 continue; // Ignorer les JARs sources
             }
 
-            // Éviter les doublons (même SHA1)
-            if (jar.sha1() != null && seenSha1s.contains(jar.sha1())) {
-                log.debug("JAR doublon ignoré (même SHA1) : {}", jar.name());
-                continue;
+            // Déterminer la catégorie (utiliser celle déjà définie pour les JARs d'EAR, ou calculer)
+            JarInfo.JarCategory category;
+            if (jar.sourceEar() != null) {
+                // JARs extraits d'EAR : garder MAIN (ils sont nécessaires au runtime)
+                category = JarInfo.JarCategory.MAIN;
+            } else {
+                category = jarScanner.categorizeByPath(jar.path(), projectRoot);
             }
-            if (jar.sha1() != null) {
-                seenSha1s.add(jar.sha1());
-            }
-
-            JarInfo.JarCategory category = jarScanner.categorizeByPath(jar.path(), projectRoot);
             JarInfo categorized = jar.withCategory(category);
 
-            switch (category) {
-                case TEST -> testLibs.add(categorized);
-                case PROVIDED -> providedLibs.add(categorized);
-                default -> mainLibs.add(categorized);
+            // Gestion des doublons : préférer MAIN > PROVIDED > TEST
+            if (jar.sha1() != null) {
+                JarInfo existing = bestByHash.get(jar.sha1());
+                if (existing != null) {
+                    // Garder le JAR avec la meilleure catégorie
+                    if (categoryPriority(category) > categoryPriority(existing.category())) {
+                        log.debug("JAR doublon remplacé (meilleure catégorie) : {} - {} -> {}",
+                            jar.name(), existing.category(), category);
+                        bestByHash.put(jar.sha1(), categorized);
+                    } else {
+                        log.debug("JAR doublon ignoré (même SHA1) : {}", jar.name());
+                    }
+                    continue;
+                }
+                bestByHash.put(jar.sha1(), categorized);
+            }
+
+            // Pas de SHA1 = ajouter directement (rare)
+            if (jar.sha1() == null) {
+                switch (category) {
+                    case TEST -> testLibs.add(categorized);
+                    case PROVIDED -> providedLibs.add(categorized);
+                    default -> mainLibs.add(categorized);
+                }
+            }
+        }
+
+        // Répartir les JARs dédupliqués par catégorie
+        for (JarInfo jar : bestByHash.values()) {
+            switch (jar.category()) {
+                case TEST -> testLibs.add(jar);
+                case PROVIDED -> providedLibs.add(jar);
+                default -> mainLibs.add(jar);
             }
         }
 
@@ -426,5 +454,19 @@ public class ProjectScanner {
         }
 
         return extractedJars;
+    }
+
+    /**
+     * Retourne la priorité d'une catégorie de JAR.
+     * MAIN a la plus haute priorité car ces JARs sont nécessaires au runtime.
+     */
+    private int categoryPriority(JarInfo.JarCategory category) {
+        if (category == null) return 0;
+        return switch (category) {
+            case MAIN -> 3;
+            case PROVIDED -> 2;
+            case RUNTIME -> 1;
+            case TEST, UNKNOWN -> 0;
+        };
     }
 }
