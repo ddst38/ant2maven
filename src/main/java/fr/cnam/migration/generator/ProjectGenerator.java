@@ -41,6 +41,18 @@ public class ProjectGenerator {
         // Créer la structure de répertoires et copier les fichiers
         structureCreator.createStructure(project, outputDir);
 
+        // Copier les JARs non résolus vers liblocale
+        int unresolvedCopied = structureCreator.copyUnresolvedJars(analysis, outputDir);
+        if (unresolvedCopied > 0) {
+            log.info("Copié {} JARs non résolus vers liblocale", unresolvedCopied);
+        }
+
+        // Copier les JARs internes résolus vers liblocale
+        int internalCopied = structureCreator.copyInternalResolvedJars(analysis, outputDir);
+        if (internalCopied > 0) {
+            log.info("Copié {} JARs internes résolus vers liblocale", internalCopied);
+        }
+
         // Générer le POM parent
         Path parentPom = generateParentPom(project, analysis, outputDir);
         createdFiles.add(parentPom);
@@ -120,7 +132,7 @@ public class ProjectGenerator {
         model.put("warName", project.primaryBuild() != null ?
             project.primaryBuild().warName().replace(".war", "") : moduleName);
 
-        // Dépendances
+        // Dépendances résolues
         List<Map<String, String>> dependencies = new ArrayList<>();
         for (DependencyInfo dep : analysis.resolved()) {
             if (dep.scope() != Scope.TEST || config.isPicBuild()) {
@@ -139,6 +151,26 @@ public class ProjectGenerator {
                 dependencies.add(depMap);
             }
         }
+
+        // Ajouter les dépendances non résolues (seront installées via install-local-jars.sh)
+        // Ces dépendances utilisent des coordonnées générées basées sur le nom du JAR
+        String basePackage = config.basePackage();
+        for (AnalysisResult.UnresolvedJar unresolved : analysis.unresolved()) {
+            JarInfo jar = unresolved.jar();
+            Map<String, String> depMap = new LinkedHashMap<>();
+
+            // Générer des coordonnées Maven pour le JAR non résolu
+            String cleanedName = fr.cnam.migration.config.JarNameCleaner.clean(jar.name());
+            String artifactName = cleanedName.replace(".jar", "");
+
+            depMap.put("groupId", basePackage + ".unresolved");
+            depMap.put("artifactId", artifactName);
+            depMap.put("version", "LOCAL");
+            depMap.put("comment", "Non résolu - installer via ./liblocale/install-local-jars.sh");
+
+            dependencies.add(depMap);
+        }
+
         model.put("dependencies", dependencies);
 
         // Ressources exclues

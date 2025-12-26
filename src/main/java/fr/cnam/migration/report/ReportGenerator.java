@@ -128,36 +128,53 @@ public class ReportGenerator {
             ));
         }
 
-        // Inclure aussi les JARs non résolus qui semblent internes
+        // Inclure TOUS les JARs non résolus (pas seulement les internes)
+        // Ces JARs doivent être installés pour permettre la compilation
         for (AnalysisResult.UnresolvedJar unresolved : analysis.unresolved()) {
             JarInfo jar = unresolved.jar();
+
+            // Nettoyer le nom du fichier (supprimer DEPFAB. et code projet)
+            String cleanedFileName = JarNameCleaner.clean(jar.name());
+            String artifactName = cleanedFileName.replace(".jar", "");
+
+            // Utiliser les mêmes coordonnées que dans le pom.xml généré
+            String groupId;
+            String artifactId;
+            String version;
+            String versionSource;
+            boolean isShaBasedVersion = false;
+
             if (jar.isInternalArtifact()) {
+                // Pour les JARs internes, utiliser les patterns internes
                 JarVersionExtractor.VersionInfo versionInfo = versionExtractor.extractVersion(jar);
+                version = versionInfo.version();
+                artifactId = versionInfo.artifactName();
+                versionSource = versionInfo.source().getDescription();
+                isShaBasedVersion = versionInfo.isShaBasedVersion();
 
-                String version = versionInfo.version();
-                String artifactId = versionInfo.artifactName();
-
-                // Si basé sur SHA, utiliser l'ID d'artefact basé sur SHA
-                if (versionInfo.isShaBasedVersion() && jar.sha1() != null) {
+                if (isShaBasedVersion && jar.sha1() != null) {
                     artifactId = versionExtractor.generateShaBasedArtifactId(jar.name(), jar.sha1());
                 }
 
                 var coord = internalPatterns.resolve(jar);
-                String groupId = coord.map(MavenCoordinate::groupId).orElse(basePackage + ".internal");
-
-                // Nettoyer le nom du fichier (supprimer DEPFAB. et code projet)
-                String cleanedFileName = JarNameCleaner.clean(jar.name());
-
-                internalJars.add(Map.of(
-                    "originalName", jar.name(),
-                    "fileName", cleanedFileName,
-                    "groupId", groupId,
-                    "artifactId", artifactId,
-                    "version", version,
-                    "versionSource", versionInfo.source().getDescription(),
-                    "isShaBasedVersion", String.valueOf(versionInfo.isShaBasedVersion())
-                ));
+                groupId = coord.map(MavenCoordinate::groupId).orElse(basePackage + ".internal");
+            } else {
+                // Pour les autres JARs non résolus, utiliser le groupe "unresolved"
+                groupId = basePackage + ".unresolved";
+                artifactId = artifactName;
+                version = "LOCAL";
+                versionSource = "Non résolu - coordonnées générées";
             }
+
+            internalJars.add(Map.of(
+                "originalName", jar.name(),
+                "fileName", cleanedFileName,
+                "groupId", groupId,
+                "artifactId", artifactId,
+                "version", version,
+                "versionSource", versionSource,
+                "isShaBasedVersion", String.valueOf(isShaBasedVersion)
+            ));
         }
 
         // Générer le script
@@ -268,39 +285,55 @@ public class ReportGenerator {
             ));
         }
 
-        // Inclure aussi les JARs internes non résolus
+        // Inclure TOUS les JARs non résolus (pas seulement les internes)
         for (AnalysisResult.UnresolvedJar unresolved : analysis.unresolved()) {
             JarInfo jar = unresolved.jar();
+
+            // Nettoyer le nom du fichier (supprimer DEPFAB. et code projet)
+            String cleanedFileName = JarNameCleaner.clean(jar.name());
+            String artifactName = cleanedFileName.replace(".jar", "");
+
+            String groupId;
+            String artifactId;
+            String version;
+            String versionSource;
+            boolean isShaBasedVersion = false;
+
             if (jar.isInternalArtifact()) {
+                // Pour les JARs internes, utiliser les patterns internes
                 JarVersionExtractor.VersionInfo versionInfo = versionExtractor.extractVersion(jar);
+                version = versionInfo.version();
+                artifactId = versionInfo.artifactName();
+                versionSource = versionInfo.source().getDescription();
+                isShaBasedVersion = versionInfo.isShaBasedVersion();
 
-                String version = versionInfo.version();
-                String artifactId = versionInfo.artifactName();
-
-                if (versionInfo.isShaBasedVersion() && jar.sha1() != null) {
+                if (isShaBasedVersion && jar.sha1() != null) {
                     artifactId = versionExtractor.generateShaBasedArtifactId(jar.name(), jar.sha1());
                 }
 
                 var patternCoord = internalPatterns.resolve(jar);
-                String groupId = patternCoord.map(MavenCoordinate::groupId).orElse(basePackage + ".internal");
-
-                MavenCoordinate coord = new MavenCoordinate(groupId, artifactId, version);
-
-                // Nettoyer le nom du fichier (supprimer DEPFAB. et code projet)
-                String cleanedFileName = JarNameCleaner.clean(jar.name());
-
-                deployableJars.add(Map.of(
-                    "originalName", jar.name(),
-                    "fileName", cleanedFileName,
-                    "path", jar.path().toAbsolutePath().toString(),
-                    "groupId", coord.groupId(),
-                    "artifactId", coord.artifactId(),
-                    "version", coord.version(),
-                    "versionSource", versionInfo.source().getDescription(),
-                    "isShaBasedVersion", String.valueOf(versionInfo.isShaBasedVersion()),
-                    "deployCommand", artifactoryClient.generateDeployCommand(jar.path(), coord, false)
-                ));
+                groupId = patternCoord.map(MavenCoordinate::groupId).orElse(basePackage + ".internal");
+            } else {
+                // Pour les autres JARs non résolus, utiliser le groupe "unresolved"
+                groupId = basePackage + ".unresolved";
+                artifactId = artifactName;
+                version = "LOCAL";
+                versionSource = "Non résolu - coordonnées générées";
             }
+
+            MavenCoordinate coord = new MavenCoordinate(groupId, artifactId, version);
+
+            deployableJars.add(Map.of(
+                "originalName", jar.name(),
+                "fileName", cleanedFileName,
+                "path", jar.path().toAbsolutePath().toString(),
+                "groupId", coord.groupId(),
+                "artifactId", coord.artifactId(),
+                "version", coord.version(),
+                "versionSource", versionSource,
+                "isShaBasedVersion", String.valueOf(isShaBasedVersion),
+                "deployCommand", artifactoryClient.generateDeployCommand(jar.path(), coord, false)
+            ));
         }
 
         // Générer le script de déploiement

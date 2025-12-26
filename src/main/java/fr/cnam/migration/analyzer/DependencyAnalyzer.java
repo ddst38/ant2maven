@@ -97,20 +97,19 @@ public class DependencyAnalyzer {
 
     /**
      * Tente de résoudre un seul JAR en utilisant le pipeline de résolution.
+     *
+     * L'ordre de résolution est important :
+     * 1. known-artifacts.yaml EN PREMIER (coordonnées Maven Central vérifiées)
+     * 2. Patterns internes (pour les vrais artefacts propriétaires CNAM)
+     * 3. Artifactory par SHA1
+     * 4. Maven Central par SHA1
+     * 5. Correspondance de pattern par nom de fichier
      */
     private ResolutionContext resolveJar(JarInfo jar) {
         List<AnalysisResult.ResolutionAttempt> attempts = new ArrayList<>();
 
-        // Stratégie 1 : Vérifier si c'est un artefact interne
-        if (internalPatterns.isInternal(jar.name())) {
-            Optional<MavenCoordinate> coord = internalPatterns.resolve(jar);
-            if (coord.isPresent()) {
-                log.debug("Resolved as internal: {} -> {}", jar.name(), coord.get().toGav());
-                return ResolutionContext.resolved(coord.get(), ResolutionMethod.INTERNAL_PATTERN, attempts);
-            }
-        }
-
-        // Stratégie 2 : Vérifier la configuration des artefacts connus
+        // Stratégie 1 : Vérifier la configuration des artefacts connus EN PREMIER
+        // Ces mappings sont fiables et permettent d'utiliser les coordonnées Maven Central
         Optional<MavenCoordinate> known = knownArtifacts.lookup(jar.name());
         if (known.isPresent()) {
             attempts.add(AnalysisResult.ResolutionAttempt.success(
@@ -120,6 +119,15 @@ public class DependencyAnalyzer {
         }
         attempts.add(AnalysisResult.ResolutionAttempt.failed(
             ResolutionMethod.KNOWN_CONFIG, "Not in known artifacts"));
+
+        // Stratégie 2 : Vérifier si c'est un artefact interne (patterns propriétaires CNAM)
+        if (internalPatterns.isInternal(jar.name())) {
+            Optional<MavenCoordinate> coord = internalPatterns.resolve(jar);
+            if (coord.isPresent()) {
+                log.debug("Resolved as internal: {} -> {}", jar.name(), coord.get().toGav());
+                return ResolutionContext.resolved(coord.get(), ResolutionMethod.INTERNAL_PATTERN, attempts);
+            }
+        }
 
         // Stratégie 3 : Recherche Artifactory par SHA1 (EN PREMIER, avant Maven Central)
         if (config.isArtifactoryConfigured() && jar.sha1() != null) {

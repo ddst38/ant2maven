@@ -1,6 +1,9 @@
 package fr.cnam.migration.generator;
 
 import fr.cnam.migration.config.JarNameCleaner;
+import fr.cnam.migration.model.AnalysisResult;
+import fr.cnam.migration.model.DependencyInfo;
+import fr.cnam.migration.model.JarInfo;
 import fr.cnam.migration.model.ProjectStructure;
 import fr.cnam.migration.model.ProjectType;
 import org.slf4j.Logger;
@@ -9,6 +12,8 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.function.Predicate;
 
 /**
@@ -180,6 +185,128 @@ public class StructureCreator {
             }
         }
         log.info("Copié {} JARs internes vers liblocale ({} noms nettoyés)", count, cleaned);
+    }
+
+    /**
+     * Copie les JARs non résolus vers le répertoire liblocale.
+     *
+     * Ces JARs n'ont pas pu être résolus en coordonnées Maven (ni sur Maven Central,
+     * ni sur Artifactory, ni via les patterns connus). Ils doivent quand même être
+     * inclus dans le projet pour permettre la compilation.
+     *
+     * @param analysis Résultat de l'analyse des dépendances
+     * @param outputDir Répertoire de sortie du projet Maven
+     * @return Nombre de JARs copiés
+     */
+    public int copyUnresolvedJars(AnalysisResult analysis, Path outputDir) throws IOException {
+        Path liblocale = outputDir.resolve("liblocale");
+        Files.createDirectories(liblocale);
+
+        // Collecter les noms de fichiers déjà présents pour éviter les doublons
+        Set<String> existingFiles = new HashSet<>();
+        if (Files.exists(liblocale)) {
+            try (var stream = Files.list(liblocale)) {
+                stream.filter(Files::isRegularFile)
+                      .forEach(p -> existingFiles.add(p.getFileName().toString()));
+            }
+        }
+
+        int count = 0;
+        for (AnalysisResult.UnresolvedJar unresolved : analysis.unresolved()) {
+            JarInfo jar = unresolved.jar();
+
+            if (!Files.exists(jar.path())) {
+                log.warn("JAR non résolu introuvable : {}", jar.path());
+                continue;
+            }
+
+            // Nettoyer le nom du JAR
+            String cleanedName = JarNameCleaner.clean(jar.name());
+
+            // Éviter les doublons
+            if (existingFiles.contains(cleanedName)) {
+                log.debug("JAR déjà présent dans liblocale : {}", cleanedName);
+                continue;
+            }
+
+            Files.copy(jar.path(), liblocale.resolve(cleanedName),
+                StandardCopyOption.REPLACE_EXISTING);
+            existingFiles.add(cleanedName);
+            count++;
+
+            if (!cleanedName.equals(jar.name())) {
+                log.info("Copié JAR non résolu : {} → {}", jar.name(), cleanedName);
+            } else {
+                log.info("Copié JAR non résolu : {}", cleanedName);
+            }
+        }
+
+        if (count > 0) {
+            log.info("Copié {} JARs non résolus vers liblocale", count);
+        }
+
+        return count;
+    }
+
+    /**
+     * Copie les JARs des dépendances internes résolues vers le répertoire liblocale.
+     *
+     * Ces JARs ont été résolus via known-artifacts.yaml ou les patterns internes,
+     * mais ils doivent quand même être installés localement car ils ne sont pas
+     * disponibles sur Maven Central.
+     *
+     * @param analysis Résultat de l'analyse des dépendances
+     * @param outputDir Répertoire de sortie du projet Maven
+     * @return Nombre de JARs copiés
+     */
+    public int copyInternalResolvedJars(AnalysisResult analysis, Path outputDir) throws IOException {
+        Path liblocale = outputDir.resolve("liblocale");
+        Files.createDirectories(liblocale);
+
+        // Collecter les noms de fichiers déjà présents pour éviter les doublons
+        Set<String> existingFiles = new HashSet<>();
+        if (Files.exists(liblocale)) {
+            try (var stream = Files.list(liblocale)) {
+                stream.filter(Files::isRegularFile)
+                      .forEach(p -> existingFiles.add(p.getFileName().toString()));
+            }
+        }
+
+        int count = 0;
+        for (DependencyInfo dep : analysis.internalDependencies()) {
+            JarInfo jar = dep.sourceJar();
+
+            if (jar == null || !Files.exists(jar.path())) {
+                log.warn("JAR interne introuvable : {}", dep.artifactId());
+                continue;
+            }
+
+            // Nettoyer le nom du JAR
+            String cleanedName = JarNameCleaner.clean(jar.name());
+
+            // Éviter les doublons
+            if (existingFiles.contains(cleanedName)) {
+                log.debug("JAR déjà présent dans liblocale : {}", cleanedName);
+                continue;
+            }
+
+            Files.copy(jar.path(), liblocale.resolve(cleanedName),
+                StandardCopyOption.REPLACE_EXISTING);
+            existingFiles.add(cleanedName);
+            count++;
+
+            if (!cleanedName.equals(jar.name())) {
+                log.info("Copié JAR interne résolu : {} → {}", jar.name(), cleanedName);
+            } else {
+                log.info("Copié JAR interne résolu : {}", cleanedName);
+            }
+        }
+
+        if (count > 0) {
+            log.info("Copié {} JARs internes résolus vers liblocale", count);
+        }
+
+        return count;
     }
 
     /**

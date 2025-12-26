@@ -29,6 +29,29 @@ public class InternalArtifactPatterns {
     }
 
     private void initializePatterns() {
+        // IMPORTANT: Les patterns spécifiques avec coordonnées Maven Central doivent être
+        // définis EN PREMIER pour avoir priorité sur les patterns génériques.
+
+        // struts.jar historique -> coordonnées Maven Central
+        patterns.add(new InternalPattern(
+            Pattern.compile("^struts\\.jar$"),
+            (m, jar) -> new MavenCoordinate(
+                "org.apache.struts",
+                "struts-core",
+                "1.3.10"
+            )
+        ));
+
+        // Oracle JDBC classes12.jar -> coordonnées Maven Central
+        patterns.add(new InternalPattern(
+            Pattern.compile("^classes12\\.jar$"),
+            (m, jar) -> new MavenCoordinate(
+                "com.oracle.database.jdbc",
+                "ojdbc8",
+                "12.2.0.1"
+            )
+        ));
+
         // DEPFAB.XXX_Y.module.jar -> {basePackage}.internal.xxx.y:module:LOCAL
         // Exemples : DEPFAB.S8_J.secJava.jar, DEPFAB.BIMC_H.core.jar
         patterns.add(new InternalPattern(
@@ -163,25 +186,7 @@ public class InternalArtifactPatterns {
             }
         ));
 
-        // Oracle JDBC classes12.jar (pilote Oracle)
-        patterns.add(new InternalPattern(
-            Pattern.compile("^classes12\\.jar$"),
-            (m, jar) -> new MavenCoordinate(
-                "com.oracle.database.jdbc",
-                "ojdbc8",
-                "12.2.0.1"
-            )
-        ));
-
-        // struts.jar historique
-        patterns.add(new InternalPattern(
-            Pattern.compile("^struts\\.jar$"),
-            (m, jar) -> new MavenCoordinate(
-                "org.apache.struts",
-                "struts-core",
-                "1.3.10"
-            )
-        ));
+        // Note: struts.jar et classes12.jar sont définis au début pour avoir priorité
     }
 
     /**
