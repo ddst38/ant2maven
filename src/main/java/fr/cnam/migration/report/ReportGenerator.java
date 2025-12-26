@@ -70,8 +70,9 @@ public class ReportGenerator {
                     .map(a -> a.method().name())
                     .collect(Collectors.joining(", "));
 
-                String suggestion = suggestAction(jar);
-                String suggestedCoord = suggestCoordinate(jar);
+                String suggestion = suggestActionFr(jar);
+                String suggestedCoord = internalPatterns.resolve(jar)
+                    .map(MavenCoordinate::toGav).orElse("N/A");
 
                 printer.printRecord(
                     jar.name(),
@@ -335,7 +336,7 @@ public class ReportGenerator {
     }
 
     /**
-     * Génère un rapport de migration HTML.
+     * Génère un rapport de migration HTML entièrement en français.
      */
     public void generateMigrationReport(ProjectStructure project, AnalysisResult analysis,
                                         Path outputDir) throws IOException {
@@ -345,14 +346,15 @@ public class ReportGenerator {
         StringBuilder html = new StringBuilder();
         html.append("""
             <!DOCTYPE html>
-            <html>
+            <html lang="fr">
             <head>
                 <meta charset="UTF-8">
-                <title>Migration Report - %s</title>
+                <title>Rapport de migration - %s</title>
                 <style>
                     body { font-family: Arial, sans-serif; margin: 20px; }
                     h1 { color: #333; }
                     h2 { color: #666; border-bottom: 1px solid #ccc; padding-bottom: 5px; }
+                    h3 { color: #555; margin-top: 20px; }
                     table { border-collapse: collapse; width: 100%%; margin: 10px 0; }
                     th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
                     th { background-color: #f4f4f4; }
@@ -360,63 +362,96 @@ public class ReportGenerator {
                     .success { color: green; }
                     .warning { color: orange; }
                     .error { color: red; }
-                    .sha-version { background-color: #fff3cd; }
+                    .info { color: #0066cc; }
                     .stat-box { display: inline-block; padding: 15px; margin: 10px; background: #f0f0f0; border-radius: 5px; }
                     .stat-value { font-size: 24px; font-weight: bold; }
                     .stat-label { color: #666; }
                     .config-table { width: auto; }
                     .config-table td { padding: 4px 12px; }
+                    .source-ear { font-style: italic; color: #666; font-size: 0.9em; }
                 </style>
             </head>
             <body>
             """.formatted(project.name()));
 
         // En-tête
-        html.append("<h1>Migration Report: ").append(project.name()).append("</h1>");
-        html.append("<p>Generated: ")
-            .append(LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")))
+        html.append("<h1>Rapport de migration : ").append(project.name()).append("</h1>");
+        html.append("<p>Généré le : ")
+            .append(LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy à HH:mm:ss")))
             .append("</p>");
 
-        // Configuration section
+        // Section Configuration
         if (config != null) {
             html.append("<h2>Configuration</h2>");
             html.append("<table class='config-table'>");
-            html.append("<tr><td><strong>Base Package:</strong></td><td>").append(config.basePackage()).append("</td></tr>");
-            html.append("<tr><td><strong>Deployment Mode:</strong></td><td>").append(config.deploymentMode()).append("</td></tr>");
+            html.append("<tr><td><strong>Package de base :</strong></td><td>").append(config.basePackage()).append("</td></tr>");
+            html.append("<tr><td><strong>Mode de déploiement :</strong></td><td>").append(config.deploymentMode()).append("</td></tr>");
             if (config.isArtifactoryConfigured()) {
-                html.append("<tr><td><strong>Artifactory:</strong></td><td>").append(config.artifactoryUrl()).append("</td></tr>");
-                html.append("<tr><td><strong>Release Repo:</strong></td><td>").append(config.artifactoryReleaseRepo()).append("</td></tr>");
+                html.append("<tr><td><strong>Artifactory :</strong></td><td>").append(config.artifactoryUrl()).append("</td></tr>");
+                html.append("<tr><td><strong>Dépôt Release :</strong></td><td>").append(config.artifactoryReleaseRepo()).append("</td></tr>");
             }
             html.append("</table>");
         }
 
-        // Summary statistics
-        html.append("<h2>Summary</h2>");
+        // Statistiques résumées
+        html.append("<h2>Résumé</h2>");
         html.append("<div class='stat-box'>");
         html.append("<div class='stat-value'>").append(project.allJars().size()).append("</div>");
-        html.append("<div class='stat-label'>Total JARs</div></div>");
+        html.append("<div class='stat-label'>JARs détectés</div></div>");
 
         html.append("<div class='stat-box'>");
         html.append("<div class='stat-value success'>").append(analysis.resolved().size()).append("</div>");
-        html.append("<div class='stat-label'>Resolved</div></div>");
+        html.append("<div class='stat-label'>Résolus</div></div>");
 
         html.append("<div class='stat-box'>");
         html.append("<div class='stat-value warning'>").append(analysis.unresolved().size()).append("</div>");
-        html.append("<div class='stat-label'>Unresolved</div></div>");
+        html.append("<div class='stat-label'>Non résolus</div></div>");
 
         html.append("<div class='stat-box'>");
         html.append("<div class='stat-value'>").append(String.format("%.1f%%", analysis.successRate())).append("</div>");
-        html.append("<div class='stat-label'>Success Rate</div></div>");
+        html.append("<div class='stat-label'>Taux de succès</div></div>");
 
-        // Résolution par méthode
-        html.append("<h2>Resolution Methods</h2>");
-        html.append("<table><tr><th>Method</th><th>Count</th></tr>");
+        // =====================================================================
+        // NOUVELLE SECTION : Bibliothèques détectées initialement
+        // =====================================================================
+        html.append("<h2>Bibliothèques détectées dans le projet (").append(project.allJars().size()).append(")</h2>");
+        html.append("<p><em>Liste complète des fichiers JAR trouvés dans le projet source, avant tout traitement.</em></p>");
+        html.append("<table><tr><th>#</th><th>Nom du fichier</th><th>Taille</th><th>Source</th><th>Catégorie</th></tr>");
+
+        int index = 1;
+        for (JarInfo jar : project.allJars()) {
+            String source = jar.sourceEar() != null ?
+                "<span class='source-ear'>Extrait de " + jar.sourceEar() + "</span>" :
+                "Répertoire lib";
+            String categoryClass = jar.category() == JarInfo.JarCategory.MAIN ? "success" :
+                                   jar.category() == JarInfo.JarCategory.TEST ? "warning" : "";
+            String categoryName = switch (jar.category()) {
+                case MAIN -> "Principal";
+                case TEST -> "Test";
+                case PROVIDED -> "Fourni";
+                case RUNTIME -> "Exécution";
+                case UNKNOWN -> "Inconnu";
+            };
+
+            html.append("<tr>");
+            html.append("<td>").append(index++).append("</td>");
+            html.append("<td><code>").append(jar.name()).append("</code></td>");
+            html.append("<td>").append(formatSize(jar.size())).append("</td>");
+            html.append("<td>").append(source).append("</td>");
+            html.append("<td class='").append(categoryClass).append("'>").append(categoryName).append("</td>");
+            html.append("</tr>");
+        }
+        html.append("</table>");
+
+        // Méthodes de résolution
+        html.append("<h2>Méthodes de résolution utilisées</h2>");
+        html.append("<table><tr><th>Méthode</th><th>Nombre</th></tr>");
         Map<ResolutionMethod, List<DependencyInfo>> byMethod = analysis.byMethod();
         for (ResolutionMethod method : ResolutionMethod.values()) {
             if (method != ResolutionMethod.UNRESOLVED) {
                 int count = byMethod.getOrDefault(method, List.of()).size();
                 if (count > 0) {
-                    html.append("<tr><td>").append(method.getDescription()).append("</td>");
+                    html.append("<tr><td>").append(getMethodDescriptionFr(method)).append("</td>");
                     html.append("<td>").append(count).append("</td></tr>");
                 }
             }
@@ -424,36 +459,36 @@ public class ReportGenerator {
         html.append("</table>");
 
         // Dépendances par scope
-        html.append("<h2>Dependencies by Scope</h2>");
-        html.append("<table><tr><th>Scope</th><th>Count</th></tr>");
+        html.append("<h2>Dépendances par portée (scope)</h2>");
+        html.append("<table><tr><th>Portée</th><th>Nombre</th></tr>");
         Map<Scope, List<DependencyInfo>> byScope = analysis.byScope();
         for (Scope scope : Scope.values()) {
             int count = byScope.getOrDefault(scope, List.of()).size();
             if (count > 0) {
-                html.append("<tr><td>").append(scope.getValue()).append("</td>");
+                html.append("<tr><td>").append(getScopeDescriptionFr(scope)).append("</td>");
                 html.append("<td>").append(count).append("</td></tr>");
             }
         }
         html.append("</table>");
 
         // Section: TOUTES les dépendances résolues (externes + internes)
-        html.append("<h2>Toutes les dépendances résolues (").append(analysis.resolved().size()).append(")</h2>");
+        html.append("<h2>Dépendances résolues (").append(analysis.resolved().size()).append(")</h2>");
         html.append("<p><em>Ces dépendances seront déclarées dans le pom.xml du module WAR.</em></p>");
 
         // Dépendances externes (Maven Central)
         List<DependencyInfo> external = analysis.externalDependencies();
         if (!external.isEmpty()) {
             html.append("<h3 class='success'>Dépendances externes - Maven Central (").append(external.size()).append(")</h3>");
-            html.append("<p><em>Ces bibliothèques seront téléchargées automatiquement par Maven.</em></p>");
+            html.append("<p><em>Ces bibliothèques seront téléchargées automatiquement par Maven depuis Maven Central.</em></p>");
             html.append("<table><tr><th>JAR d'origine</th><th>Coordonnées Maven</th><th>Méthode de résolution</th></tr>");
             for (DependencyInfo dep : external) {
                 String originalName = dep.sourceJar().name();
                 String cleanedName = JarNameCleaner.clean(originalName);
                 String displayName = originalName.equals(cleanedName) ? originalName : originalName + " → " + cleanedName;
 
-                html.append("<tr><td>").append(displayName).append("</td>");
+                html.append("<tr><td><code>").append(displayName).append("</code></td>");
                 html.append("<td><code>").append(dep.coordinate().toGav()).append("</code></td>");
-                html.append("<td>").append(dep.method().getDescription()).append("</td></tr>");
+                html.append("<td>").append(getMethodDescriptionFr(dep.method())).append("</td></tr>");
             }
             html.append("</table>");
         }
@@ -469,9 +504,9 @@ public class ReportGenerator {
                 String cleanedName = JarNameCleaner.clean(originalName);
                 String displayName = originalName.equals(cleanedName) ? originalName : originalName + " → " + cleanedName;
 
-                html.append("<tr><td>").append(displayName).append("</td>");
+                html.append("<tr><td><code>").append(displayName).append("</code></td>");
                 html.append("<td><code>").append(dep.coordinate().toGav()).append("</code></td>");
-                html.append("<td>").append(dep.method().getDescription()).append("</td></tr>");
+                html.append("<td>").append(getMethodDescriptionFr(dep.method())).append("</td></tr>");
             }
             html.append("</table>");
         }
@@ -489,57 +524,84 @@ public class ReportGenerator {
                 String displayName = originalName.equals(cleanedName) ? originalName : originalName + " → " + cleanedName;
                 String artifactName = cleanedName.replace(".jar", "");
 
-                html.append("<tr><td>").append(displayName).append("</td>");
+                html.append("<tr><td><code>").append(displayName).append("</code></td>");
                 html.append("<td><code>").append(basePackage).append(".unresolved:").append(artifactName).append(":LOCAL</code></td>");
                 html.append("<td>").append(formatSize(jar.size())).append("</td>");
-                html.append("<td>").append(suggestAction(jar)).append("</td></tr>");
+                html.append("<td>").append(suggestActionFr(jar)).append("</td></tr>");
             }
             html.append("</table>");
         }
 
         // Informations du projet
-        html.append("<h2>Project Information</h2>");
+        html.append("<h2>Informations sur le projet</h2>");
         html.append("<table>");
-        html.append("<tr><th>Property</th><th>Value</th></tr>");
-        html.append("<tr><td>Project Type</td><td>").append(project.type()).append("</td></tr>");
-        html.append("<tr><td>Main Java Files</td><td>")
+        html.append("<tr><th>Propriété</th><th>Valeur</th></tr>");
+        html.append("<tr><td>Type de projet</td><td>").append(project.type()).append("</td></tr>");
+        html.append("<tr><td>Fichiers Java principaux</td><td>")
             .append(project.sourceLayout().mainJavaFileCount()).append("</td></tr>");
-        html.append("<tr><td>Test Java Files</td><td>")
+        html.append("<tr><td>Fichiers Java de test</td><td>")
             .append(project.sourceLayout().testJavaFileCount()).append("</td></tr>");
-        html.append("<tr><td>Internal Dependencies</td><td>")
+        html.append("<tr><td>Dépendances internes (properties.conf)</td><td>")
             .append(project.internalDeps().size()).append("</td></tr>");
         html.append("</table>");
 
         html.append("</body></html>");
 
         Files.writeString(reportFile, html.toString());
-        log.info("Generated migration-report.html");
+        log.info("Rapport migration-report.html généré");
     }
 
-    private String suggestAction(JarInfo jar) {
+    /**
+     * Retourne la description française d'une méthode de résolution.
+     */
+    private String getMethodDescriptionFr(ResolutionMethod method) {
+        return switch (method) {
+            case KNOWN_CONFIG -> "Configuration connue (known-artifacts.yaml)";
+            case INTERNAL_PATTERN -> "Pattern d'artefact interne";
+            case ARTIFACTORY_CHECKSUM -> "Checksum Artifactory";
+            case ARTIFACTORY -> "Recherche Artifactory";
+            case CHECKSUM -> "Checksum Maven Central";
+            case MANIFEST -> "Analyse MANIFEST.MF";
+            case PATTERN -> "Pattern de nom de fichier";
+            case UNRESOLVED -> "Non résolu";
+        };
+    }
+
+    /**
+     * Retourne la description française d'une portée Maven.
+     */
+    private String getScopeDescriptionFr(Scope scope) {
+        return switch (scope) {
+            case COMPILE -> "Compilation (compile)";
+            case PROVIDED -> "Fourni (provided)";
+            case RUNTIME -> "Exécution (runtime)";
+            case TEST -> "Test (test)";
+            case SYSTEM -> "Système (system)";
+        };
+    }
+
+    /**
+     * Suggère une action en français pour un JAR non résolu.
+     */
+    private String suggestActionFr(JarInfo jar) {
         String name = jar.name();
 
         if (name.startsWith("DEPFAB.") || name.startsWith("jk-socle-")) {
-            return "Internal artifact - will be installed/deployed automatically";
+            return "Artefact interne - sera installé automatiquement";
         }
         if (name.contains("oracle") || name.equals("classes12.jar")) {
-            return "Oracle JDBC - download from Oracle and install manually";
+            return "Oracle JDBC - télécharger depuis Oracle et installer manuellement";
         }
         if (name.contains("-sources")) {
-            return "Source JAR - can be excluded from dependencies";
+            return "JAR source - peut être exclu des dépendances";
         }
         if (name.startsWith("Service") || name.startsWith("SOCA")) {
-            return "CNAM service - will be installed/deployed automatically";
+            return "Service CNAM - sera installé automatiquement";
         }
         if (name.equals("struts.jar")) {
-            return "Legacy Struts - map to org.apache.struts:struts-core:1.3.10";
+            return "Struts legacy - mapper vers org.apache.struts:struts-core:1.3.10";
         }
-        return "Search manually on Maven Central or vendor website";
-    }
-
-    private String suggestCoordinate(JarInfo jar) {
-        var coord = internalPatterns.resolve(jar);
-        return coord.map(MavenCoordinate::toGav).orElse("N/A");
+        return "Rechercher manuellement sur Maven Central ou le site du fournisseur";
     }
 
     private String formatSize(long bytes) {
