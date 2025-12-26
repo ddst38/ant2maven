@@ -26,10 +26,27 @@ import java.util.zip.ZipFile;
  * Les fichiers EAR (Enterprise Archive) peuvent contenir des bibliothèques JAR,
  * notamment dans APP-INF/lib/. Ces JARs sont extraits et inclus dans l'analyse.
  * C'est particulièrement important pour les frameworks WebLogic (modules _W).
+ *
+ * Note: Le fichier empty.jar est ignoré car c'est un fichier placeholder sans contenu utile.
  */
 public class JarScanner {
 
     private static final Logger log = LoggerFactory.getLogger(JarScanner.class);
+
+    /**
+     * Liste des JARs à ignorer complètement lors du scan.
+     * Ces fichiers ne sont ni analysés, ni copiés, ni déclarés dans le pom.xml.
+     */
+    private static final List<String> IGNORED_JARS = List.of(
+        "empty.jar"  // Fichier placeholder sans contenu utile
+    );
+
+    /**
+     * Vérifie si un JAR doit être ignoré.
+     */
+    private boolean shouldIgnore(String jarName) {
+        return IGNORED_JARS.contains(jarName.toLowerCase());
+    }
 
     /**
      * Trouve tous les fichiers JAR dans le répertoire donné et ses sous-répertoires.
@@ -40,8 +57,13 @@ public class JarScanner {
         Files.walkFileTree(directory, new SimpleFileVisitor<>() {
             @Override
             public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
-                String fileName = file.getFileName().toString().toLowerCase();
-                if (fileName.endsWith(".jar")) {
+                String fileName = file.getFileName().toString();
+                if (fileName.toLowerCase().endsWith(".jar")) {
+                    // Ignorer les JARs de la liste d'exclusion
+                    if (shouldIgnore(fileName)) {
+                        log.debug("JAR ignoré : {}", fileName);
+                        return FileVisitResult.CONTINUE;
+                    }
                     try {
                         String sha1 = computeSha1(file);
                         jars.add(JarInfo.of(file, attrs.size(), sha1));
@@ -173,6 +195,13 @@ public class JarScanner {
 
                 // Chercher les fichiers JAR dans l'EAR
                 if (!entry.isDirectory() && entryName.toLowerCase().endsWith(".jar")) {
+                    // Ignorer les JARs de la liste d'exclusion
+                    String jarFileName = Path.of(entryName).getFileName().toString();
+                    if (shouldIgnore(jarFileName)) {
+                        log.debug("JAR ignoré dans EAR : {}", jarFileName);
+                        continue;
+                    }
+
                     // Extraire le JAR
                     Path targetPath = extractDir.resolve(Path.of(entryName).getFileName());
 

@@ -287,10 +287,14 @@ public class ProjectGenerator {
 
     /**
      * Construit la section de gestion des dépendances.
+     *
+     * Le dependencyManagement du parent ne contient que les dépendances internes (fr.cnamts.*)
+     * pour centraliser leurs versions. Les dépendances externes (Maven Central) sont déclarées
+     * directement dans le module enfant avec leurs versions complètes.
      */
     private List<Map<String, String>> buildDependencyManagement(AnalysisResult analysis) {
         return analysis.resolved().stream()
-            .filter(dep -> !dep.isInternal())
+            .filter(DependencyInfo::isInternal)  // Seulement les dépendances internes
             .map(dep -> {
                 Map<String, String> m = new LinkedHashMap<>();
                 m.put("groupId", dep.groupId());
