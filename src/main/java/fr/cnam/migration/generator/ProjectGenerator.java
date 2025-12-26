@@ -314,57 +314,29 @@ public class ProjectGenerator {
     }
 
     /**
-     * Installe le Maven wrapper.
+     * Installe le Maven wrapper en copiant les fichiers depuis les ressources.
      */
     private void installMavenWrapper(Path outputDir) throws IOException {
-        // Créer le répertoire .mvn/wrapper
-        Path wrapperDir = outputDir.resolve(".mvn/wrapper");
-        Files.createDirectories(wrapperDir);
+        // Copier mvnw depuis les ressources
+        try (var mvnwStream = getClass().getResourceAsStream("/maven-wrapper/mvnw")) {
+            if (mvnwStream != null) {
+                Path mvnwPath = outputDir.resolve("mvnw");
+                Files.copy(mvnwStream, mvnwPath, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                mvnwPath.toFile().setExecutable(true);
+            } else {
+                log.warn("Ressource mvnw introuvable");
+            }
+        }
 
-        // Créer maven-wrapper.properties
-        String wrapperProps = """
-            distributionUrl=https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/3.9.6/apache-maven-3.9.6-bin.zip
-            wrapperUrl=https://repo.maven.apache.org/maven2/org/apache/maven/wrapper/maven-wrapper/3.2.0/maven-wrapper-3.2.0.jar
-            """;
-        Files.writeString(wrapperDir.resolve("maven-wrapper.properties"), wrapperProps);
-
-        // Créer le script mvnw
-        String mvnw = """
-            #!/bin/sh
-            # Maven Wrapper script
-            # Download and run Maven wrapper
-
-            MAVEN_PROJECTBASEDIR="${MAVEN_BASEDIR:-$(cd "$(dirname "$0")" && pwd)}"
-            WRAPPER_JAR="$MAVEN_PROJECTBASEDIR/.mvn/wrapper/maven-wrapper.jar"
-
-            if [ ! -f "$WRAPPER_JAR" ]; then
-                echo "Downloading Maven wrapper..."
-                mkdir -p "$(dirname "$WRAPPER_JAR")"
-                curl -sLo "$WRAPPER_JAR" "https://repo.maven.apache.org/maven2/org/apache/maven/wrapper/maven-wrapper/3.2.0/maven-wrapper-3.2.0.jar"
-            fi
-
-            exec java -jar "$WRAPPER_JAR" "$@"
-            """;
-        Path mvnwPath = outputDir.resolve("mvnw");
-        Files.writeString(mvnwPath, mvnw);
-        mvnwPath.toFile().setExecutable(true);
-
-        // Créer mvnw.cmd pour Windows
-        String mvnwCmd = """
-            @echo off
-            setlocal
-
-            set MAVEN_PROJECTBASEDIR=%~dp0
-            set WRAPPER_JAR=%MAVEN_PROJECTBASEDIR%.mvn\\wrapper\\maven-wrapper.jar
-
-            if not exist "%WRAPPER_JAR%" (
-                echo Downloading Maven wrapper...
-                powershell -Command "Invoke-WebRequest -Uri 'https://repo.maven.apache.org/maven2/org/apache/maven/wrapper/maven-wrapper/3.2.0/maven-wrapper-3.2.0.jar' -OutFile '%WRAPPER_JAR%'"
-            )
-
-            java -jar "%WRAPPER_JAR%" %*
-            """;
-        Files.writeString(outputDir.resolve("mvnw.cmd"), mvnwCmd);
+        // Copier mvnw.cmd depuis les ressources
+        try (var mvnwCmdStream = getClass().getResourceAsStream("/maven-wrapper/mvnw.cmd")) {
+            if (mvnwCmdStream != null) {
+                Files.copy(mvnwCmdStream, outputDir.resolve("mvnw.cmd"),
+                    java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            } else {
+                log.warn("Ressource mvnw.cmd introuvable");
+            }
+        }
 
         log.info("Maven wrapper installed");
     }
