@@ -28,24 +28,6 @@
 </#list>
     </modules>
 
-    <dependencyManagement>
-        <dependencies>
-<#list dependencyManagement as dep>
-            <dependency>
-                <groupId>${dep.groupId}</groupId>
-                <artifactId>${dep.artifactId}</artifactId>
-                <version>${dep.version}</version>
-<#if dep.scope?? && dep.scope != "compile">
-                <scope>${dep.scope}</scope>
-</#if>
-<#if dep.classifier??>
-                <classifier>${dep.classifier}</classifier>
-</#if>
-            </dependency>
-</#list>
-        </dependencies>
-    </dependencyManagement>
-
 <#if internalRepository??>
     <repositories>
         <repository>

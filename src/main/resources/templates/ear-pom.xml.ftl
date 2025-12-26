@@ -24,17 +24,6 @@
             <version>${parent.version}</version>
             <type>war</type>
         </dependency>
-<#if appInfLibs?? && appInfLibs?size gt 0>
-
-        <!-- APP-INF/lib dependencies -->
-<#list appInfLibs as lib>
-        <dependency>
-            <groupId>${lib.groupId}</groupId>
-            <artifactId>${lib.artifactId}</artifactId>
-            <version>${lib.version}</version>
-        </dependency>
-</#list>
-</#if>
     </dependencies>
 
     <build>
