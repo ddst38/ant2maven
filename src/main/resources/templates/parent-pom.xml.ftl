@@ -14,7 +14,7 @@
     <description>Migrated from Ant/CVS project</description>
 
     <properties>
-        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <project.build.sourceEncoding>ISO-8859-1</project.build.sourceEncoding>
         <maven.compiler.source>21</maven.compiler.source>
         <maven.compiler.target>21</maven.compiler.target>
 <#list properties as name, value>
@@ -47,7 +47,7 @@
                     <version>3.11.0</version>
                     <configuration>
                         <release>21</release>
-                        <encoding>UTF-8</encoding>
+                        <encoding>${r"${project.build.sourceEncoding}"}</encoding>
                     </configuration>
                 </plugin>
                 <plugin>
