@@ -151,7 +151,7 @@ public class ReportGenerator {
 
         StringBuilder script = new StringBuilder();
         script.append("#!/bin/bash\n");
-        script.append("# Installation des JARs dans le repository Maven local (.m2)\n");
+        script.append("# Installation des JARs dans le repository Maven local du projet\n");
         script.append("# Généré par ant2maven le ").append(LocalDateTime.now().format(
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))).append("\n");
         script.append("#\n");
@@ -159,11 +159,12 @@ public class ReportGenerator {
         script.append("# Les coordonnées Maven correspondent EXACTEMENT à celles du pom.xml.\n");
         script.append("#\n");
         script.append("# Note: Les préfixes DEPFAB. et codes projet ont été supprimés des noms de fichiers.\n");
+        script.append("# Note: Utilise le repository local du projet (localMvnRepository/)\n");
         script.append("\n");
         script.append("set -e\n");
-        script.append("cd \"$(dirname \"$0\")\"\n");
+        script.append("cd \"$(dirname \"$0\")/..\"\n");
         script.append("\n");
-        script.append("echo \"Installation des JARs dans le repository Maven local...\"\n");
+        script.append("echo \"Installation des JARs dans le repository Maven local du projet...\"\n");
         script.append("\n");
 
         for (Map<String, String> jar : jarsToInstall) {
@@ -178,8 +179,8 @@ public class ReportGenerator {
                 script.append("# ").append(typeMarker).append(" ").append(fileName).append("\n");
             }
             script.append("# Source: ").append(jar.get("versionSource")).append("\n");
-            script.append("mvn install:install-file \\\n");
-            script.append("    -Dfile=\"").append(fileName).append("\" \\\n");
+            script.append("./mvnw -s .mvn/wrapper/settings.xml install:install-file \\\n");
+            script.append("    -Dfile=\"liblocale/").append(fileName).append("\" \\\n");
             script.append("    -DgroupId=\"").append(jar.get("groupId")).append("\" \\\n");
             script.append("    -DartifactId=\"").append(jar.get("artifactId")).append("\" \\\n");
             script.append("    -Dversion=\"").append(jar.get("version")).append("\" \\\n");

@@ -332,9 +332,43 @@ public class ProjectGenerator {
     }
 
     /**
-     * Installe le Maven wrapper en copiant les fichiers depuis les ressources.
+     * Installe le Maven wrapper avec un repository local autonome.
+     *
+     * Crée la structure suivante :
+     * - .mvn/wrapper/maven-wrapper.properties (URLs Maven)
+     * - .mvn/wrapper/settings.xml (localRepository vers localMvnRepository)
+     * - localMvnRepository/ (repository Maven local au projet)
+     * - mvnw, mvnw.cmd (scripts wrapper)
      */
     private void installMavenWrapper(Path outputDir) throws IOException {
+        // Créer le répertoire .mvn/wrapper/
+        Path mvnWrapperDir = outputDir.resolve(".mvn/wrapper");
+        Files.createDirectories(mvnWrapperDir);
+
+        // Copier maven-wrapper.properties
+        try (var propsStream = getClass().getResourceAsStream("/maven-wrapper/maven-wrapper.properties")) {
+            if (propsStream != null) {
+                Files.copy(propsStream, mvnWrapperDir.resolve("maven-wrapper.properties"),
+                    java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            } else {
+                log.warn("Ressource maven-wrapper.properties introuvable");
+            }
+        }
+
+        // Copier settings.xml (avec localRepository pointant vers localMvnRepository)
+        try (var settingsStream = getClass().getResourceAsStream("/maven-wrapper/settings.xml")) {
+            if (settingsStream != null) {
+                Files.copy(settingsStream, mvnWrapperDir.resolve("settings.xml"),
+                    java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            } else {
+                log.warn("Ressource settings.xml introuvable");
+            }
+        }
+
+        // Créer le répertoire localMvnRepository pour le repository local autonome
+        Path localRepoDir = outputDir.resolve("localMvnRepository");
+        Files.createDirectories(localRepoDir);
+
         // Copier mvnw depuis les ressources
         try (var mvnwStream = getClass().getResourceAsStream("/maven-wrapper/mvnw")) {
             if (mvnwStream != null) {
@@ -356,7 +390,7 @@ public class ProjectGenerator {
             }
         }
 
-        log.info("Maven wrapper installed");
+        log.info("Maven wrapper installé avec repository local autonome");
     }
 
     /**

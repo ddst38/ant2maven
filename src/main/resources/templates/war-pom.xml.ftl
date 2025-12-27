@@ -17,6 +17,13 @@
     <name>${artifactId}</name>
 
     <dependencies>
+        <!-- Servlet API - fourni par le serveur d'applications -->
+        <dependency>
+            <groupId>javax.servlet</groupId>
+            <artifactId>javax.servlet-api</artifactId>
+            <version>3.1.0</version>
+            <scope>provided</scope>
+        </dependency>
 <#list dependencies as dep>
         <dependency>
             <groupId>${dep.groupId}</groupId>
