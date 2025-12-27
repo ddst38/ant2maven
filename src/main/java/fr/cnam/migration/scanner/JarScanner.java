@@ -10,6 +10,7 @@ import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.SimpleFileVisitor;
+import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -144,11 +145,29 @@ public class JarScanner {
 
     /**
      * Catégorise les JARs en fonction de leur emplacement dans le projet.
+     *
+     * Priorité de catégorisation :
+     * 1. APP-INF/lib ou WEB-INF/lib → MAIN (dépendances runtime d'entreprise)
+     * 2. src/test/ ou lib/test/ → TEST (tests unitaires/intégration)
+     * 3. provided/ → PROVIDED
+     * 4. runtime/ → RUNTIME
+     * 5. Défaut → MAIN
      */
     public JarInfo.JarCategory categorizeByPath(Path jarPath, Path projectRoot) {
         String pathStr = projectRoot.relativize(jarPath).toString().toLowerCase();
 
-        if (pathStr.contains("/test/") || pathStr.contains("\\test\\") ||
+        // Priorité 1 : Les JARs dans APP-INF/lib ou WEB-INF/lib sont toujours MAIN
+        // Ces répertoires contiennent les dépendances runtime de l'application
+        if (pathStr.contains("app-inf/lib") || pathStr.contains("app-inf\\lib") ||
+            pathStr.contains("web-inf/lib") || pathStr.contains("web-inf\\lib")) {
+            return JarInfo.JarCategory.MAIN;
+        }
+
+        // Priorité 2 : Les répertoires de test explicites
+        // src/test/ = code de test Maven/Gradle
+        // lib/test/ = bibliothèques de test
+        if (pathStr.contains("src/test/") || pathStr.contains("src\\test\\") ||
+            pathStr.contains("/lib/test/") || pathStr.contains("\\lib\\test\\") ||
             pathStr.contains("/lib/test") || pathStr.contains("\\lib\\test")) {
             return JarInfo.JarCategory.TEST;
         }
@@ -214,7 +233,7 @@ public class JarScanner {
 
                     try (InputStream is = zipFile.getInputStream(entry)) {
                         Files.createDirectories(targetPath.getParent());
-                        Files.copy(is, targetPath);
+                        Files.copy(is, targetPath, StandardCopyOption.REPLACE_EXISTING);
 
                         // Calculer le SHA1 et créer le JarInfo
                         String sha1 = computeSha1(targetPath);
