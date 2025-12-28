@@ -37,6 +37,15 @@ public record AnalysisResult(
     }
 
     /**
+     * Retourne toutes les dépendances nécessitant une installation locale (version LOCAL).
+     */
+    public List<DependencyInfo> localDependencies() {
+        return resolved.stream()
+            .filter(DependencyInfo::needsLocalInstall)
+            .toList();
+    }
+
+    /**
      * Retourne toutes les dépendances externes (Maven Central).
      */
     public List<DependencyInfo> externalDependencies() {

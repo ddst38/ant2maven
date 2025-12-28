@@ -40,6 +40,11 @@ public enum ResolutionMethod {
     PATTERN("Correspondance de pattern sur nom de fichier"),
 
     /**
+     * JAR identifié par analyse des packages contenus.
+     */
+    PACKAGE_ANALYSIS("Analyse des packages du JAR"),
+
+    /**
      * JAR non résolu.
      */
     UNRESOLVED("Non résolu");

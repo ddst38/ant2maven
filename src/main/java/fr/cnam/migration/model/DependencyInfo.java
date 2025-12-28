@@ -24,6 +24,14 @@ public record DependencyInfo(
         return groupId.startsWith("fr.cnamts") || groupId.startsWith("fr.cnam");
     }
 
+    /**
+     * Vérifie si cette dépendance nécessite une installation locale.
+     * Une dépendance nécessite une installation locale si sa version est "LOCAL".
+     */
+    public boolean needsLocalInstall() {
+        return "LOCAL".equals(coordinate.version());
+    }
+
     public String groupId() {
         return coordinate.groupId();
     }

@@ -265,8 +265,8 @@ public class StructureCreator {
         int count = 0;
         int skippedExternal = 0;
 
-        // Copier uniquement les dépendances internes (fr.cnamts.* ou fr.cnam.*)
-        for (DependencyInfo dep : analysis.internalDependencies()) {
+        // Copier les dépendances avec version LOCAL (nécessitent installation locale)
+        for (DependencyInfo dep : analysis.localDependencies()) {
             JarInfo jar = dep.sourceJar();
 
             if (jar == null || !Files.exists(jar.path())) {

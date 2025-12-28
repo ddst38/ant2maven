@@ -1,5 +1,6 @@
 package fr.cnam.migration.config;
 
+import fr.cnam.migration.analyzer.JarPackageAnalyzer;
 import fr.cnam.migration.model.JarInfo;
 import fr.cnam.migration.model.MavenCoordinate;
 
@@ -18,13 +19,19 @@ public class InternalArtifactPatterns {
 
     private final String basePackage;
     private final List<InternalPattern> patterns = new ArrayList<>();
+    private final JarPackageAnalyzer packageAnalyzer;
 
     public InternalArtifactPatterns() {
-        this(MigrationConfig.DEFAULT_BASE_PACKAGE);
+        this(MigrationConfig.DEFAULT_BASE_PACKAGE, new JarPackageAnalyzer());
     }
 
     public InternalArtifactPatterns(String basePackage) {
+        this(basePackage, new JarPackageAnalyzer());
+    }
+
+    public InternalArtifactPatterns(String basePackage, JarPackageAnalyzer packageAnalyzer) {
         this.basePackage = basePackage != null ? basePackage : MigrationConfig.DEFAULT_BASE_PACKAGE;
+        this.packageAnalyzer = packageAnalyzer;
         initializePatterns();
     }
 
@@ -169,13 +176,25 @@ public class InternalArtifactPatterns {
             )
         ));
 
-        // JARs internes génériques sans version (biblicnam.jar, archirfe.jar, etc.)
+        // JARs génériques sans version - utilise l'analyse des packages pour déterminer le groupId
         patterns.add(new InternalPattern(
             Pattern.compile("^([a-z][a-z0-9]+)\\.jar$"),
             (m, jar) -> {
                 String name = m.group(1);
-                // Ne matcher que si ça ressemble à un artefact interne (nom court, pas de version)
+                // Ne matcher que si ça ressemble à un artefact (nom court, pas de version)
                 if (name.length() <= 15 && !name.contains("-")) {
+                    // Analyser le contenu du JAR pour trouver le package réel
+                    if (jar.path() != null) {
+                        JarPackageAnalyzer.PackageAnalysis analysis = packageAnalyzer.analyze(jar.path());
+                        if (analysis.inferredGroupId() != null) {
+                            return new MavenCoordinate(
+                                analysis.inferredGroupId(),
+                                name,
+                                "LOCAL"
+                            );
+                        }
+                    }
+                    // Fallback si l'analyse échoue
                     return new MavenCoordinate(
                         basePackage + ".internal",
                         name,

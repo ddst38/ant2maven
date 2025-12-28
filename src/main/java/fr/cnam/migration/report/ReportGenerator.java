@@ -103,9 +103,9 @@ public class ReportGenerator {
         List<Map<String, String>> jarsToInstall = new ArrayList<>();
         String basePackage = config != null ? config.basePackage() : MigrationConfig.DEFAULT_BASE_PACKAGE;
 
-        // 1. Collecter les dépendances internes résolues
+        // 1. Collecter les dépendances avec version LOCAL
         // Ces JARs utilisent les MÊMES coordonnées que dans le pom.xml
-        for (DependencyInfo dep : analysis.internalDependencies()) {
+        for (DependencyInfo dep : analysis.localDependencies()) {
             JarInfo jar = dep.sourceJar();
 
             // Nettoyer le nom du fichier (supprimer DEPFAB. et code projet)
@@ -564,6 +564,7 @@ public class ReportGenerator {
             case CHECKSUM -> "Checksum Maven Central";
             case MANIFEST -> "Analyse MANIFEST.MF";
             case PATTERN -> "Pattern de nom de fichier";
+            case PACKAGE_ANALYSIS -> "Analyse des packages du JAR";
             case UNRESOLVED -> "Non résolu";
         };
     }
