@@ -50,19 +50,38 @@ public class ReportGenerator {
     }
 
     /**
-     * Génère le fichier libnotfound.csv pour les JARs non résolus.
+     * Génère le fichier libnotfound.csv pour les JARs non trouvés sur Maven Central/Artifactory.
+     * Inclut les JARs non résolus ET les JARs résolus localement (version LOCAL).
      */
     public void generateLibNotFoundCsv(AnalysisResult analysis, Path outputDir)
             throws IOException {
         Path csvFile = outputDir.resolve("libnotfound.csv");
+        int count = 0;
 
         try (CSVPrinter printer = new CSVPrinter(
                 Files.newBufferedWriter(csvFile),
                 CSVFormat.DEFAULT.builder()
-                    .setHeader("JAR Name", "Size (bytes)", "SHA1", "Attempted Methods",
-                              "Suggested Action", "Suggested Coordinate")
+                    .setHeader("JAR Name", "Size (bytes)", "SHA1", "Resolution Method",
+                              "Maven Coordinate", "Status")
                     .build())) {
 
+            // 1. JARs résolus avec version LOCAL (non trouvés sur Maven Central)
+            for (DependencyInfo dep : analysis.localDependencies()) {
+                JarInfo jar = dep.sourceJar();
+                if (jar == null) continue;
+
+                printer.printRecord(
+                    jar.name(),
+                    jar.size(),
+                    jar.sha1() != null ? jar.sha1() : "N/A",
+                    dep.method().getDescription(),
+                    dep.groupId() + ":" + dep.artifactId() + ":" + dep.version(),
+                    "Résolu localement - à installer via install-local-jars.sh"
+                );
+                count++;
+            }
+
+            // 2. JARs non résolus
             for (AnalysisResult.UnresolvedJar unresolved : analysis.unresolved()) {
                 JarInfo jar = unresolved.jar();
 
@@ -70,7 +89,6 @@ public class ReportGenerator {
                     .map(a -> a.method().name())
                     .collect(Collectors.joining(", "));
 
-                String suggestion = suggestActionFr(jar);
                 String suggestedCoord = internalPatterns.resolve(jar)
                     .map(MavenCoordinate::toGav).orElse("N/A");
 
@@ -79,13 +97,14 @@ public class ReportGenerator {
                     jar.size(),
                     jar.sha1() != null ? jar.sha1() : "N/A",
                     methods,
-                    suggestion,
-                    suggestedCoord
+                    suggestedCoord,
+                    "Non résolu - recherche manuelle requise"
                 );
+                count++;
             }
         }
 
-        log.info("Generated libnotfound.csv with {} entries", analysis.unresolved().size());
+        log.info("Generated libnotfound.csv with {} entries", count);
     }
 
     /**
