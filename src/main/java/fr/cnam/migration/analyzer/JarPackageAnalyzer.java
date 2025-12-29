@@ -140,15 +140,10 @@ public class JarPackageAnalyzer {
             return packageName;
         }
 
-        if (parts[0].equals("org") || parts[0].equals("com") || parts[0].equals("io") ||
-            parts[0].equals("net") || parts[0].equals("javax")) {
-            if (parts.length >= 3) {
-                return parts[0] + "." + parts[1] + "." + parts[2];
-            }
-        } else if (parts[0].equals("fr") || parts[0].equals("de") || parts[0].equals("uk")) {
-            if (parts.length >= 2) {
-                return parts[0] + "." + parts[1];
-            }
+        // Tous les domaines utilisent 3 niveaux de profondeur pour le groupId
+        // Exemples: org.apache.struts, com.cnamts.rfe, fr.cnamts.securite
+        if (parts.length >= 3) {
+            return parts[0] + "." + parts[1] + "." + parts[2];
         }
 
         int depth = Math.min(3, parts.length);

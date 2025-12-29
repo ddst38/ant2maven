@@ -180,13 +180,14 @@ public class InternalArtifactPatterns {
         ));
 
         // JARs génériques sans version - utilise l'analyse des packages pour déterminer le groupId
+        // Accepte les noms en minuscules ou camelCase (ex: biblicnam.jar, jAuthApp.jar)
         // Utilise le SHA1 du JAR comme version pour garantir l'unicité
         patterns.add(new InternalPattern(
-            Pattern.compile("^([a-z][a-z0-9]+)\\.jar$"),
+            Pattern.compile("^([a-zA-Z][a-zA-Z0-9]*)\\.jar$"),
             (m, jar) -> {
                 String name = m.group(1);
                 // Ne matcher que si ça ressemble à un artefact (nom court, pas de version)
-                if (name.length() <= 15 && !name.contains("-")) {
+                if (name.length() <= 20 && !name.contains("-")) {
                     String version = jar.sha1() != null ? "SHA-" + jar.sha1() : "UNKNOWN";
                     // Analyser le contenu du JAR pour trouver le package réel
                     if (jar.path() != null) {
