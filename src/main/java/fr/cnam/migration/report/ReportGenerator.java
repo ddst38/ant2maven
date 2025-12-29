@@ -442,22 +442,33 @@ public class ReportGenerator {
             html.append("</table>");
         }
 
+        // Calcul des statistiques cohérentes avec les sections détaillées
+        int totalDetected = project.allJars().size();
+        int resolvedCount = (int) analysis.resolved().stream()
+            .filter(d -> !d.needsLocalInstall())
+            .count();
+        int unresolvedCount = (int) analysis.resolved().stream()
+            .filter(DependencyInfo::needsLocalInstall)
+            .count() + analysis.unresolved().size();
+        int totalAfterDedup = resolvedCount + unresolvedCount;
+        double successRate = totalAfterDedup > 0 ? (resolvedCount * 100.0 / totalAfterDedup) : 0;
+
         // Statistiques résumées
         html.append("<h2>Résumé</h2>");
         html.append("<div class='stat-box'>");
-        html.append("<div class='stat-value'>").append(project.allJars().size()).append("</div>");
+        html.append("<div class='stat-value'>").append(totalDetected).append("</div>");
         html.append("<div class='stat-label'>JARs détectés</div></div>");
 
         html.append("<div class='stat-box'>");
-        html.append("<div class='stat-value success'>").append(analysis.resolved().size()).append("</div>");
+        html.append("<div class='stat-value success'>").append(resolvedCount).append("</div>");
         html.append("<div class='stat-label'>Résolus</div></div>");
 
         html.append("<div class='stat-box'>");
-        html.append("<div class='stat-value warning'>").append(analysis.unresolved().size()).append("</div>");
+        html.append("<div class='stat-value warning'>").append(unresolvedCount).append("</div>");
         html.append("<div class='stat-label'>Non résolus</div></div>");
 
         html.append("<div class='stat-box'>");
-        html.append("<div class='stat-value'>").append(String.format("%.1f%%", analysis.successRate())).append("</div>");
+        html.append("<div class='stat-value'>").append(String.format("%.1f%%", successRate)).append("</div>");
         html.append("<div class='stat-label'>Taux de succès</div></div>");
 
         // =====================================================================

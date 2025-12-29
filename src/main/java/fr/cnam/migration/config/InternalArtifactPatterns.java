@@ -1,6 +1,7 @@
 package fr.cnam.migration.config;
 
 import fr.cnam.migration.analyzer.JarPackageAnalyzer;
+import fr.cnam.migration.analyzer.JarVersionExtractor;
 import fr.cnam.migration.model.JarInfo;
 import fr.cnam.migration.model.MavenCoordinate;
 
@@ -20,18 +21,24 @@ public class InternalArtifactPatterns {
     private final String basePackage;
     private final List<InternalPattern> patterns = new ArrayList<>();
     private final JarPackageAnalyzer packageAnalyzer;
+    private final JarVersionExtractor versionExtractor;
 
     public InternalArtifactPatterns() {
-        this(MigrationConfig.DEFAULT_BASE_PACKAGE, new JarPackageAnalyzer());
+        this(MigrationConfig.DEFAULT_BASE_PACKAGE, new JarPackageAnalyzer(), new JarVersionExtractor());
     }
 
     public InternalArtifactPatterns(String basePackage) {
-        this(basePackage, new JarPackageAnalyzer());
+        this(basePackage, new JarPackageAnalyzer(), new JarVersionExtractor());
     }
 
     public InternalArtifactPatterns(String basePackage, JarPackageAnalyzer packageAnalyzer) {
+        this(basePackage, packageAnalyzer, new JarVersionExtractor());
+    }
+
+    public InternalArtifactPatterns(String basePackage, JarPackageAnalyzer packageAnalyzer, JarVersionExtractor versionExtractor) {
         this.basePackage = basePackage != null ? basePackage : MigrationConfig.DEFAULT_BASE_PACKAGE;
         this.packageAnalyzer = packageAnalyzer;
+        this.versionExtractor = versionExtractor;
         initializePatterns();
     }
 
@@ -39,14 +46,17 @@ public class InternalArtifactPatterns {
         // IMPORTANT: Les patterns spécifiques avec coordonnées Maven Central doivent être
         // définis EN PREMIER pour avoir priorité sur les patterns génériques.
 
-        // struts.jar historique -> coordonnées Maven Central
+        // struts.jar historique -> coordonnées Maven Central avec version extraite du manifest
         patterns.add(new InternalPattern(
             Pattern.compile("^struts\\.jar$"),
-            (m, jar) -> new MavenCoordinate(
-                "org.apache.struts",
-                "struts-core",
-                "1.3.10"
-            )
+            (m, jar) -> {
+                // Extraire la version du manifest ou du nom de fichier
+                JarVersionExtractor.VersionInfo versionInfo = versionExtractor.extractVersion(jar);
+                String version = versionInfo != null && versionInfo.version() != null
+                    ? versionInfo.version()
+                    : (jar.sha1() != null ? "SHA-" + jar.sha1() : "UNKNOWN");
+                return new MavenCoordinate("org.apache.struts", "struts-core", version);
+            }
         ));
 
         // Oracle JDBC classes12.jar -> coordonnées Maven Central

@@ -219,13 +219,14 @@ public class DependencyAnalyzer {
     }
 
     /**
-     * Supprime les doublons et normalise les versions.
+     * Supprime les doublons exacts (même groupId:artifactId:version).
+     * Les JARs avec des versions différentes sont conservés comme dépendances distinctes.
      */
     private List<DependencyInfo> deduplicateAndNormalize(List<DependencyInfo> dependencies) {
-        // Grouper par groupId:artifactId
+        // Grouper par groupId:artifactId:version (coordonnées complètes)
         Map<String, List<DependencyInfo>> grouped = dependencies.stream()
             .collect(Collectors.groupingBy(
-                d -> d.groupId() + ":" + d.artifactId(),
+                d -> d.groupId() + ":" + d.artifactId() + ":" + d.version(),
                 LinkedHashMap::new,
                 Collectors.toList()
             ));
@@ -233,19 +234,11 @@ public class DependencyAnalyzer {
         List<DependencyInfo> result = new ArrayList<>();
 
         for (Map.Entry<String, List<DependencyInfo>> entry : grouped.entrySet()) {
-            List<DependencyInfo> versions = entry.getValue();
-            if (versions.size() == 1) {
-                result.add(versions.get(0));
-            } else {
-                // Prendre la version la plus haute ou celle avec une version non-LOCAL/non-SHA
-                DependencyInfo best = versions.stream()
-                    .filter(d -> !"LOCAL".equals(d.version()) && !d.version().startsWith("SHA-"))
-                    .max(Comparator.comparing(d -> d.version()))
-                    .orElse(versions.get(0));
-
-                log.debug("Deduplicated {}: {} versions -> {}", entry.getKey(),
-                    versions.size(), best.version());
-                result.add(best);
+            List<DependencyInfo> duplicates = entry.getValue();
+            // Prendre le premier (tous ont les mêmes coordonnées complètes)
+            result.add(duplicates.get(0));
+            if (duplicates.size() > 1) {
+                log.debug("Deduplicated {}: {} duplicates removed", entry.getKey(), duplicates.size() - 1);
             }
         }
 
