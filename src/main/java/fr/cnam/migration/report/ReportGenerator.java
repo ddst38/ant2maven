@@ -1,6 +1,7 @@
 package fr.cnam.migration.report;
 
 import fr.cnam.migration.analyzer.ArtifactoryClient;
+import fr.cnam.migration.analyzer.JarPackageAnalyzer;
 import fr.cnam.migration.analyzer.JarVersionExtractor;
 import fr.cnam.migration.config.InternalArtifactPatterns;
 import fr.cnam.migration.config.JarNameCleaner;
@@ -144,23 +145,37 @@ public class ReportGenerator {
         }
 
         // 2. Collecter les JARs non résolus
-        // Ces JARs utilisent les coordonnées générées (basePackage.unresolved:artifactName:LOCAL)
+        // Ces JARs utilisent les coordonnées générées avec SHA comme version
+        // Analyse le package réel du JAR pour déterminer le groupId correct
+        JarPackageAnalyzer packageAnalyzer = new JarPackageAnalyzer();
         for (AnalysisResult.UnresolvedJar unresolved : analysis.unresolved()) {
             JarInfo jar = unresolved.jar();
 
             // Nettoyer le nom du fichier (supprimer DEPFAB. et code projet)
             String cleanedFileName = JarNameCleaner.clean(jar.name());
             String artifactName = cleanedFileName.replace(".jar", "");
+            // Utiliser le SHA1 comme version pour garantir l'unicité
+            String version = jar.sha1() != null ? "SHA-" + jar.sha1() : "UNKNOWN";
+
+            // Analyser le package réel du JAR pour déterminer le groupId
+            String groupId;
+            JarPackageAnalyzer.PackageAnalysis pkgAnalysis = packageAnalyzer.analyze(jar.path());
+            if (pkgAnalysis.inferredGroupId() != null) {
+                groupId = pkgAnalysis.inferredGroupId();
+            } else {
+                groupId = basePackage;
+            }
+            boolean isInternal = groupId.startsWith("fr.cnam");
 
             // Utiliser les MÊMES coordonnées que dans le pom.xml
             jarsToInstall.add(Map.of(
                 "originalName", jar.name(),
                 "fileName", cleanedFileName,
-                "groupId", basePackage + ".unresolved",
+                "groupId", groupId,
                 "artifactId", artifactName,
-                "version", "LOCAL",
-                "versionSource", "Non résolu - coordonnées générées",
-                "isInternal", "false"
+                "version", version,
+                "versionSource", "Non résolu - version basée sur SHA",
+                "isInternal", String.valueOf(isInternal)
             ));
         }
 
@@ -267,18 +282,32 @@ public class ReportGenerator {
         }
 
         // 2. Collecter les JARs non résolus
-        // Utiliser les MÊMES coordonnées que dans le pom.xml
+        // Utiliser les MÊMES coordonnées que dans le pom.xml avec SHA comme version
+        // Analyse le package réel du JAR pour déterminer le groupId correct
+        JarPackageAnalyzer deployPackageAnalyzer = new JarPackageAnalyzer();
         for (AnalysisResult.UnresolvedJar unresolved : analysis.unresolved()) {
             JarInfo jar = unresolved.jar();
 
             // Nettoyer le nom du fichier (supprimer DEPFAB. et code projet)
             String cleanedFileName = JarNameCleaner.clean(jar.name());
             String artifactName = cleanedFileName.replace(".jar", "");
+            // Utiliser le SHA1 comme version pour garantir l'unicité
+            String version = jar.sha1() != null ? "SHA-" + jar.sha1() : "UNKNOWN";
+
+            // Analyser le package réel du JAR pour déterminer le groupId
+            String groupId;
+            JarPackageAnalyzer.PackageAnalysis pkgAnalysis = deployPackageAnalyzer.analyze(jar.path());
+            if (pkgAnalysis.inferredGroupId() != null) {
+                groupId = pkgAnalysis.inferredGroupId();
+            } else {
+                groupId = basePackage;
+            }
+            boolean isInternal = groupId.startsWith("fr.cnam");
 
             MavenCoordinate coord = new MavenCoordinate(
-                basePackage + ".unresolved",
+                groupId,
                 artifactName,
-                "LOCAL"
+                version
             );
 
             deployableJars.add(Map.of(
@@ -288,8 +317,8 @@ public class ReportGenerator {
                 "groupId", coord.groupId(),
                 "artifactId", coord.artifactId(),
                 "version", coord.version(),
-                "versionSource", "Non résolu - coordonnées générées",
-                "isInternal", "false",
+                "versionSource", "Non résolu - version basée sur SHA",
+                "isInternal", String.valueOf(isInternal),
                 "deployCommand", artifactoryClient.generateDeployCommand(jar.path(), coord, false)
             ));
         }
@@ -491,65 +520,204 @@ public class ReportGenerator {
         }
         html.append("</table>");
 
-        // Section: TOUTES les dépendances résolues (externes + internes)
-        html.append("<h2>Dépendances résolues (").append(analysis.resolved().size()).append(")</h2>");
-        html.append("<p><em>Ces dépendances seront déclarées dans le pom.xml du module WAR.</em></p>");
+        // =====================================================================
+        // SECTION : Bibliothèques résolues (Maven Central ou Artifactory uniquement)
+        // =====================================================================
+        // Seules les bibliothèques trouvées sur Maven Central ou Artifactory sont "résolues"
+        List<DependencyInfo> trulyResolved = analysis.resolved().stream()
+            .filter(d -> d.method() == ResolutionMethod.CHECKSUM ||
+                        d.method() == ResolutionMethod.ARTIFACTORY ||
+                        d.method() == ResolutionMethod.ARTIFACTORY_CHECKSUM ||
+                        (d.method() == ResolutionMethod.KNOWN_CONFIG && !d.needsLocalInstall()))
+            .toList();
 
-        // Dépendances externes (Maven Central)
-        List<DependencyInfo> external = analysis.externalDependencies();
-        if (!external.isEmpty()) {
-            html.append("<h3 class='success'>Dépendances externes - Maven Central (").append(external.size()).append(")</h3>");
-            html.append("<p><em>Ces bibliothèques seront téléchargées automatiquement par Maven depuis Maven Central.</em></p>");
-            html.append("<table><tr><th>JAR d'origine</th><th>Coordonnées Maven</th><th>Méthode de résolution</th></tr>");
-            for (DependencyInfo dep : external) {
-                String originalName = dep.sourceJar().name();
-                String cleanedName = JarNameCleaner.clean(originalName);
-                String displayName = originalName.equals(cleanedName) ? originalName : originalName + " → " + cleanedName;
+        html.append("<h2>Bibliothèques résolues (").append(trulyResolved.size()).append(")</h2>");
+        html.append("<p><em>Ces bibliothèques seront téléchargées automatiquement par Maven depuis un dépôt distant.</em></p>");
 
-                html.append("<tr><td><code>").append(displayName).append("</code></td>");
-                html.append("<td><code>").append(dep.coordinate().toGav()).append("</code></td>");
-                html.append("<td>").append(getMethodDescriptionFr(dep.method())).append("</td></tr>");
+        // Sous-section : Résolues depuis Maven Central
+        List<DependencyInfo> resolvedMavenCentral = trulyResolved.stream()
+            .filter(d -> d.method() == ResolutionMethod.CHECKSUM ||
+                        (d.method() == ResolutionMethod.KNOWN_CONFIG && !d.needsLocalInstall()))
+            .toList();
+
+        if (!resolvedMavenCentral.isEmpty()) {
+            List<DependencyInfo> mcExternal = resolvedMavenCentral.stream().filter(d -> !d.isInternal()).toList();
+            List<DependencyInfo> mcInternal = resolvedMavenCentral.stream().filter(DependencyInfo::isInternal).toList();
+
+            html.append("<h3 class='success'>Depuis Maven Central (").append(resolvedMavenCentral.size()).append(")</h3>");
+
+            if (!mcExternal.isEmpty()) {
+                html.append("<h4>Externes (").append(mcExternal.size()).append(")</h4>");
+                html.append("<table><tr><th>JAR d'origine</th><th>Coordonnées Maven</th><th>Méthode</th></tr>");
+                for (DependencyInfo dep : mcExternal) {
+                    appendResolvedDependencyRow(html, dep);
+                }
+                html.append("</table>");
             }
-            html.append("</table>");
+
+            if (!mcInternal.isEmpty()) {
+                html.append("<h4>Internes fr.cnam* (").append(mcInternal.size()).append(")</h4>");
+                html.append("<table><tr><th>JAR d'origine</th><th>Coordonnées Maven</th><th>Méthode</th></tr>");
+                for (DependencyInfo dep : mcInternal) {
+                    appendResolvedDependencyRow(html, dep);
+                }
+                html.append("</table>");
+            }
         }
 
-        // Dépendances internes (fr.cnamts.*)
-        List<DependencyInfo> internal = analysis.internalDependencies();
-        if (!internal.isEmpty()) {
-            html.append("<h3 class='warning'>Dépendances internes - Installation locale requise (").append(internal.size()).append(")</h3>");
-            html.append("<p><em>Ces bibliothèques doivent être installées via <code>./liblocale/install-local-jars.sh</code></em></p>");
-            html.append("<table><tr><th>JAR d'origine</th><th>Coordonnées Maven</th><th>Méthode de résolution</th></tr>");
-            for (DependencyInfo dep : internal) {
-                String originalName = dep.sourceJar().name();
-                String cleanedName = JarNameCleaner.clean(originalName);
-                String displayName = originalName.equals(cleanedName) ? originalName : originalName + " → " + cleanedName;
+        // Sous-section : Résolues depuis Artifactory
+        List<DependencyInfo> resolvedArtifactory = trulyResolved.stream()
+            .filter(d -> d.method() == ResolutionMethod.ARTIFACTORY ||
+                        d.method() == ResolutionMethod.ARTIFACTORY_CHECKSUM)
+            .toList();
 
-                html.append("<tr><td><code>").append(displayName).append("</code></td>");
-                html.append("<td><code>").append(dep.coordinate().toGav()).append("</code></td>");
-                html.append("<td>").append(getMethodDescriptionFr(dep.method())).append("</td></tr>");
+        if (!resolvedArtifactory.isEmpty()) {
+            List<DependencyInfo> artExternal = resolvedArtifactory.stream().filter(d -> !d.isInternal()).toList();
+            List<DependencyInfo> artInternal = resolvedArtifactory.stream().filter(DependencyInfo::isInternal).toList();
+
+            html.append("<h3 class='success'>Depuis Artifactory (").append(resolvedArtifactory.size()).append(")</h3>");
+
+            if (!artExternal.isEmpty()) {
+                html.append("<h4>Externes (").append(artExternal.size()).append(")</h4>");
+                html.append("<table><tr><th>JAR d'origine</th><th>Coordonnées Maven</th><th>Méthode</th></tr>");
+                for (DependencyInfo dep : artExternal) {
+                    appendResolvedDependencyRow(html, dep);
+                }
+                html.append("</table>");
             }
-            html.append("</table>");
+
+            if (!artInternal.isEmpty()) {
+                html.append("<h4>Internes fr.cnam* (").append(artInternal.size()).append(")</h4>");
+                html.append("<table><tr><th>JAR d'origine</th><th>Coordonnées Maven</th><th>Méthode</th></tr>");
+                for (DependencyInfo dep : artInternal) {
+                    appendResolvedDependencyRow(html, dep);
+                }
+                html.append("</table>");
+            }
         }
 
-        // JARs non résolus
-        if (!analysis.unresolved().isEmpty()) {
-            html.append("<h3 class='error'>JARs non résolus - Installation locale requise (").append(analysis.unresolved().size()).append(")</h3>");
-            html.append("<p><em>Ces bibliothèques n'ont pas pu être identifiées. Elles seront installées avec des coordonnées générées.</em></p>");
-            html.append("<table><tr><th>JAR d'origine</th><th>Coordonnées générées</th><th>Taille</th><th>Action suggérée</th></tr>");
+        // =====================================================================
+        // SECTION : Bibliothèques non résolues (installation locale requise)
+        // =====================================================================
+        // Inclut les dépendances "resolved" qui nécessitent une installation locale
+        // ET les dépendances vraiment non résolues
+        List<DependencyInfo> needsLocalInstall = analysis.resolved().stream()
+            .filter(DependencyInfo::needsLocalInstall)
+            .toList();
+
+        int totalUnresolved = needsLocalInstall.size() + analysis.unresolved().size();
+
+        if (totalUnresolved > 0) {
+            html.append("<h2 class='warning'>Bibliothèques non résolues (").append(totalUnresolved).append(")</h2>");
+            html.append("<p><em>Ces bibliothèques ne sont pas disponibles sur Maven Central ou Artifactory. ");
+            html.append("Elles doivent être installées via <code>./liblocale/install-local-jars.sh</code></em></p>");
+
             String basePackage = config != null ? config.basePackage() : MigrationConfig.DEFAULT_BASE_PACKAGE;
-            for (AnalysisResult.UnresolvedJar unresolved : analysis.unresolved()) {
-                JarInfo jar = unresolved.jar();
-                String originalName = jar.name();
-                String cleanedName = JarNameCleaner.clean(originalName);
-                String displayName = originalName.equals(cleanedName) ? originalName : originalName + " → " + cleanedName;
-                String artifactName = cleanedName.replace(".jar", "");
+            JarPackageAnalyzer reportPackageAnalyzer = new JarPackageAnalyzer();
 
-                html.append("<tr><td><code>").append(displayName).append("</code></td>");
-                html.append("<td><code>").append(basePackage).append(".unresolved:").append(artifactName).append(":LOCAL</code></td>");
-                html.append("<td>").append(formatSize(jar.size())).append("</td>");
-                html.append("<td>").append(suggestActionFr(jar)).append("</td></tr>");
+            // 1. Dépendances identifiées par pattern mais nécessitant installation locale
+            if (!needsLocalInstall.isEmpty()) {
+                List<DependencyInfo> localVersioned = needsLocalInstall.stream()
+                    .filter(d -> !d.version().startsWith("SHA-"))
+                    .toList();
+                List<DependencyInfo> localSha = needsLocalInstall.stream()
+                    .filter(d -> d.version().startsWith("SHA-"))
+                    .toList();
+
+                // Sous-section : Avec version identifiée (par pattern)
+                if (!localVersioned.isEmpty()) {
+                    List<DependencyInfo> lvExternal = localVersioned.stream().filter(d -> !d.isInternal()).toList();
+                    List<DependencyInfo> lvInternal = localVersioned.stream().filter(DependencyInfo::isInternal).toList();
+
+                    html.append("<h3>Avec version identifiée (").append(localVersioned.size()).append(")</h3>");
+                    html.append("<p><em>Version extraite du nom de fichier ou par pattern.</em></p>");
+
+                    if (!lvExternal.isEmpty()) {
+                        html.append("<h4>Externes (").append(lvExternal.size()).append(")</h4>");
+                        html.append("<table><tr><th>JAR d'origine</th><th>Coordonnées Maven</th><th>Méthode</th></tr>");
+                        for (DependencyInfo dep : lvExternal) {
+                            appendResolvedDependencyRow(html, dep);
+                        }
+                        html.append("</table>");
+                    }
+
+                    if (!lvInternal.isEmpty()) {
+                        html.append("<h4>Internes fr.cnam* (").append(lvInternal.size()).append(")</h4>");
+                        html.append("<table><tr><th>JAR d'origine</th><th>Coordonnées Maven</th><th>Méthode</th></tr>");
+                        for (DependencyInfo dep : lvInternal) {
+                            appendResolvedDependencyRow(html, dep);
+                        }
+                        html.append("</table>");
+                    }
+                }
+
+                // Sous-section : Avec version SHA (identifiées par pattern)
+                if (!localSha.isEmpty()) {
+                    List<DependencyInfo> lsExternal = localSha.stream().filter(d -> !d.isInternal()).toList();
+                    List<DependencyInfo> lsInternal = localSha.stream().filter(DependencyInfo::isInternal).toList();
+
+                    html.append("<h3>Avec version SHA - identifiées par pattern (").append(localSha.size()).append(")</h3>");
+                    html.append("<p><em>Version basée sur le checksum SHA1 du fichier JAR.</em></p>");
+
+                    if (!lsExternal.isEmpty()) {
+                        html.append("<h4>Externes (").append(lsExternal.size()).append(")</h4>");
+                        html.append("<table><tr><th>JAR d'origine</th><th>Coordonnées Maven</th><th>Méthode</th></tr>");
+                        for (DependencyInfo dep : lsExternal) {
+                            appendResolvedDependencyRow(html, dep);
+                        }
+                        html.append("</table>");
+                    }
+
+                    if (!lsInternal.isEmpty()) {
+                        html.append("<h4>Internes fr.cnam* (").append(lsInternal.size()).append(")</h4>");
+                        html.append("<table><tr><th>JAR d'origine</th><th>Coordonnées Maven</th><th>Méthode</th></tr>");
+                        for (DependencyInfo dep : lsInternal) {
+                            appendResolvedDependencyRow(html, dep);
+                        }
+                        html.append("</table>");
+                    }
+                }
             }
-            html.append("</table>");
+
+            // 2. Dépendances vraiment non résolues (aucun pattern n'a fonctionné)
+            if (!analysis.unresolved().isEmpty()) {
+                html.append("<h3>Non identifiées - version SHA (").append(analysis.unresolved().size()).append(")</h3>");
+                html.append("<p><em>Aucun pattern n'a permis d'identifier ces bibliothèques. ");
+                html.append("Le groupId est extrait de l'analyse du contenu du JAR.</em></p>");
+
+                // Catégoriser par interne/externe en analysant le package réel du JAR
+                List<AnalysisResult.UnresolvedJar> usExternal = new ArrayList<>();
+                List<AnalysisResult.UnresolvedJar> usInternal = new ArrayList<>();
+
+                for (AnalysisResult.UnresolvedJar unresolved : analysis.unresolved()) {
+                    JarPackageAnalyzer.PackageAnalysis pkgAnalysis = reportPackageAnalyzer.analyze(unresolved.jar().path());
+                    boolean isInternal = pkgAnalysis.inferredGroupId() != null &&
+                                        pkgAnalysis.inferredGroupId().startsWith("fr.cnam");
+                    if (isInternal) {
+                        usInternal.add(unresolved);
+                    } else {
+                        usExternal.add(unresolved);
+                    }
+                }
+
+                if (!usExternal.isEmpty()) {
+                    html.append("<h4>Externes (").append(usExternal.size()).append(")</h4>");
+                    html.append("<table><tr><th>JAR d'origine</th><th>Coordonnées générées</th><th>Taille</th><th>Action suggérée</th></tr>");
+                    for (AnalysisResult.UnresolvedJar unresolved : usExternal) {
+                        appendUnresolvedJarRowWithAnalysis(html, unresolved.jar(), basePackage, reportPackageAnalyzer);
+                    }
+                    html.append("</table>");
+                }
+
+                if (!usInternal.isEmpty()) {
+                    html.append("<h4>Internes fr.cnam* (").append(usInternal.size()).append(")</h4>");
+                    html.append("<table><tr><th>JAR d'origine</th><th>Coordonnées générées</th><th>Taille</th><th>Action suggérée</th></tr>");
+                    for (AnalysisResult.UnresolvedJar unresolved : usInternal) {
+                        appendUnresolvedJarRowWithAnalysis(html, unresolved.jar(), basePackage, reportPackageAnalyzer);
+                    }
+                    html.append("</table>");
+                }
+            }
         }
 
         // Informations du projet
@@ -623,6 +791,45 @@ public class ReportGenerator {
             return "Struts legacy - mapper vers org.apache.struts:struts-core:1.3.10";
         }
         return "Rechercher manuellement sur Maven Central ou le site du fournisseur";
+    }
+
+    /**
+     * Ajoute une ligne de tableau pour une dépendance résolue.
+     */
+    private void appendResolvedDependencyRow(StringBuilder html, DependencyInfo dep) {
+        String originalName = dep.sourceJar().name();
+        String cleanedName = JarNameCleaner.clean(originalName);
+        String displayName = originalName.equals(cleanedName) ? originalName : originalName + " → " + cleanedName;
+
+        html.append("<tr><td><code>").append(displayName).append("</code></td>");
+        html.append("<td><code>").append(dep.coordinate().toGav()).append("</code></td>");
+        html.append("<td>").append(getMethodDescriptionFr(dep.method())).append("</td></tr>");
+    }
+
+    /**
+     * Ajoute une ligne de tableau pour un JAR non résolu avec analyse du package réel.
+     */
+    private void appendUnresolvedJarRowWithAnalysis(StringBuilder html, JarInfo jar, String basePackage,
+                                                     JarPackageAnalyzer packageAnalyzer) {
+        String originalName = jar.name();
+        String cleanedName = JarNameCleaner.clean(originalName);
+        String displayName = originalName.equals(cleanedName) ? originalName : originalName + " → " + cleanedName;
+        String artifactName = cleanedName.replace(".jar", "");
+        String version = jar.sha1() != null ? "SHA-" + jar.sha1() : "UNKNOWN";
+
+        // Analyser le package réel du JAR pour déterminer le groupId
+        String groupId;
+        JarPackageAnalyzer.PackageAnalysis pkgAnalysis = packageAnalyzer.analyze(jar.path());
+        if (pkgAnalysis.inferredGroupId() != null) {
+            groupId = pkgAnalysis.inferredGroupId();
+        } else {
+            groupId = basePackage;
+        }
+
+        html.append("<tr><td><code>").append(displayName).append("</code></td>");
+        html.append("<td><code>").append(groupId).append(":").append(artifactName).append(":").append(version).append("</code></td>");
+        html.append("<td>").append(formatSize(jar.size())).append("</td>");
+        html.append("<td>").append(suggestActionFr(jar)).append("</td></tr>");
     }
 
     private String formatSize(long bytes) {

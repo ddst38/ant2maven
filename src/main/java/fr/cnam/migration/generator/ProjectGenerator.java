@@ -1,14 +1,18 @@
 package fr.cnam.migration.generator;
 
+import fr.cnam.migration.analyzer.JarPackageAnalyzer;
 import fr.cnam.migration.config.MigrationConfig;
 import fr.cnam.migration.model.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.MessageDigest;
 import java.util.*;
+import java.util.HexFormat;
 import java.util.stream.Collectors;
 
 /**
@@ -169,6 +173,9 @@ public class ProjectGenerator {
         }
 
         // 2. Dépendances non résolues (seront installées via install-local-jars.sh)
+        // Utilise le SHA1 du JAR comme version pour garantir l'unicité
+        // Analyse le package réel du JAR pour déterminer le groupId correct
+        JarPackageAnalyzer packageAnalyzer = new JarPackageAnalyzer();
         for (AnalysisResult.UnresolvedJar unresolved : analysis.unresolved()) {
             JarInfo jar = unresolved.jar();
             Map<String, String> depMap = new LinkedHashMap<>();
@@ -176,13 +183,23 @@ public class ProjectGenerator {
             // Générer des coordonnées Maven pour le JAR non résolu
             String cleanedName = fr.cnam.migration.config.JarNameCleaner.clean(jar.name());
             String artifactName = cleanedName.replace(".jar", "");
+            String version = jar.sha1() != null ? "SHA-" + jar.sha1() : "UNKNOWN";
 
-            depMap.put("groupId", basePackage + ".unresolved");
+            // Analyser le package réel du JAR pour déterminer le groupId
+            String groupId;
+            JarPackageAnalyzer.PackageAnalysis pkgAnalysis = packageAnalyzer.analyze(jar.path());
+            if (pkgAnalysis.inferredGroupId() != null) {
+                groupId = pkgAnalysis.inferredGroupId();
+            } else {
+                groupId = basePackage;
+            }
+
+            depMap.put("groupId", groupId);
             depMap.put("artifactId", artifactName);
-            depMap.put("version", "LOCAL");
+            depMap.put("version", version);
             depMap.put("comment", "Non résolu - installer via ./liblocale/install-local-jars.sh");
 
-            log.debug("  Dépendance non résolue: {}.unresolved:{}:LOCAL", basePackage, artifactName);
+            log.debug("  Dépendance non résolue: {}:{}:{}", groupId, artifactName, version);
 
             dependencies.add(depMap);
         }
@@ -228,16 +245,18 @@ public class ProjectGenerator {
             model.put("hasAppInfConf", earConfig.appInfConfFiles() != null &&
                 !earConfig.appInfConfFiles().isEmpty());
 
-            // Dépendances APP-INF/lib
+            // Dépendances APP-INF/lib - utilise le SHA1 comme version pour garantir l'unicité
             if (earConfig.hasAppInfLib()) {
                 List<Map<String, String>> appInfLibs = new ArrayList<>();
                 for (Path jarPath : earConfig.appInfLibJars()) {
                     String jarName = jarPath.getFileName().toString();
+                    String sha1 = computeSha1(jarPath);
+                    String version = sha1 != null ? "SHA-" + sha1 : "UNKNOWN";
                     // Ce sont typiquement des artefacts internes
                     appInfLibs.add(Map.of(
                         "groupId", config.basePackage() + ".internal",
                         "artifactId", jarName.replace(".jar", ""),
-                        "version", "LOCAL"
+                        "version", version
                     ));
                 }
                 model.put("appInfLibs", appInfLibs);
@@ -391,6 +410,25 @@ public class ProjectGenerator {
         }
 
         log.info("Maven wrapper installé avec repository local autonome");
+    }
+
+    /**
+     * Calcule le SHA1 d'un fichier JAR.
+     * Retourne null en cas d'erreur.
+     */
+    private String computeSha1(Path jarPath) {
+        try (InputStream is = Files.newInputStream(jarPath)) {
+            MessageDigest digest = MessageDigest.getInstance("SHA-1");
+            byte[] buffer = new byte[8192];
+            int bytesRead;
+            while ((bytesRead = is.read(buffer)) != -1) {
+                digest.update(buffer, 0, bytesRead);
+            }
+            return HexFormat.of().formatHex(digest.digest());
+        } catch (Exception e) {
+            log.warn("Impossible de calculer le SHA1 pour {}: {}", jarPath, e.getMessage());
+            return null;
+        }
     }
 
     /**

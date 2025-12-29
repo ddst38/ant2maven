@@ -59,14 +59,15 @@ public class InternalArtifactPatterns {
             )
         ));
 
-        // DEPFAB.XXX_Y.module.jar -> {basePackage}.internal.xxx.y:module:LOCAL
+        // DEPFAB.XXX_Y.module.jar -> {basePackage}.internal.xxx.y:module:SHA-{sha1}
         // Exemples : DEPFAB.S8_J.secJava.jar, DEPFAB.BIMC_H.core.jar
+        // Utilise le SHA1 du JAR comme version pour garantir l'unicité
         patterns.add(new InternalPattern(
             Pattern.compile("^DEPFAB\\.([A-Z0-9]+_[A-Z])\\.(.+)\\.jar$"),
             (m, jar) -> new MavenCoordinate(
                 basePackage + ".internal." + m.group(1).toLowerCase().replace("_", "."),
                 m.group(2),
-                "LOCAL"
+                jar.sha1() != null ? "SHA-" + jar.sha1() : "UNKNOWN"
             )
         ));
 
@@ -103,13 +104,14 @@ public class InternalArtifactPatterns {
             )
         ));
 
-        // Pattern DEPFAB générique : DEPFAB.anything.jar
+        // Pattern DEPFAB générique : DEPFAB.anything.jar -> SHA-{sha1}
+        // Utilise le SHA1 du JAR comme version pour garantir l'unicité
         patterns.add(new InternalPattern(
             Pattern.compile("^DEPFAB\\.(.+)\\.jar$"),
             (m, jar) -> new MavenCoordinate(
                 basePackage + ".internal",
                 m.group(1).replaceAll("[^a-zA-Z0-9-]", "-").toLowerCase(),
-                "LOCAL"
+                jar.sha1() != null ? "SHA-" + jar.sha1() : "UNKNOWN"
             )
         ));
 
@@ -166,23 +168,26 @@ public class InternalArtifactPatterns {
             )
         ));
 
-        // tracesCaster.jar et JARs autonomes similaires
+        // tracesCaster.jar et JARs autonomes similaires -> SHA-{sha1}
+        // Utilise le SHA1 du JAR comme version pour garantir l'unicité
         patterns.add(new InternalPattern(
             Pattern.compile("^(tracesCaster)\\.jar$"),
             (m, jar) -> new MavenCoordinate(
                 basePackage + ".internal",
                 m.group(1),
-                "LOCAL"
+                jar.sha1() != null ? "SHA-" + jar.sha1() : "UNKNOWN"
             )
         ));
 
         // JARs génériques sans version - utilise l'analyse des packages pour déterminer le groupId
+        // Utilise le SHA1 du JAR comme version pour garantir l'unicité
         patterns.add(new InternalPattern(
             Pattern.compile("^([a-z][a-z0-9]+)\\.jar$"),
             (m, jar) -> {
                 String name = m.group(1);
                 // Ne matcher que si ça ressemble à un artefact (nom court, pas de version)
                 if (name.length() <= 15 && !name.contains("-")) {
+                    String version = jar.sha1() != null ? "SHA-" + jar.sha1() : "UNKNOWN";
                     // Analyser le contenu du JAR pour trouver le package réel
                     if (jar.path() != null) {
                         JarPackageAnalyzer.PackageAnalysis analysis = packageAnalyzer.analyze(jar.path());
@@ -190,7 +195,7 @@ public class InternalArtifactPatterns {
                             return new MavenCoordinate(
                                 analysis.inferredGroupId(),
                                 name,
-                                "LOCAL"
+                                version
                             );
                         }
                     }
@@ -198,7 +203,7 @@ public class InternalArtifactPatterns {
                     return new MavenCoordinate(
                         basePackage + ".internal",
                         name,
-                        "LOCAL"
+                        version
                     );
                 }
                 return null;
