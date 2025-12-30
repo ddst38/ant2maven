@@ -28,6 +28,7 @@ Outil de migration automatique pour transformer des projets Java Ant/CVS en proj
 
 - **Analyse automatique** des projets Ant/CVS
 - **Détection des dépendances** via lookup SHA1 sur Maven Central et/ou Artifactory
+- **Cache automatique** : les résolutions sont sauvegardées pour accélérer les exécutions suivantes
 - **Support multi-modules** : génération de projets WAR/EAR
 - **Gestion des JARs internes** avec versionnement SHA pour éviter les collisions
 - **Intégration Artifactory** avec support SSL personnalisé
@@ -175,74 +176,67 @@ java -jar ant2maven-1.0.0-SNAPSHOT.jar \
 
 ### Fichier known-artifacts.yaml
 
-Ce fichier définit le mapping entre les noms de fichiers JAR et leurs coordonnées Maven. Il est utilisé pour les JARs dont le nom ne permet pas de déterminer automatiquement les coordonnées.
+Ce fichier sert de **cache** pour les résolutions de dépendances. Il utilise le **SHA1 du JAR comme clé** pour garantir une correspondance exacte, quel que soit le nom du fichier.
+
+#### Fonctionnement du cache
+
+1. **Première exécution** : Les JARs sont recherchés sur Maven Central/Artifactory (lent)
+2. **Résolution réussie** : L'entrée SHA1 → coordonnées Maven est automatiquement ajoutée au fichier
+3. **Exécutions suivantes** : Les JARs déjà résolus sont trouvés instantanément via leur SHA1
 
 #### Emplacement
 
-- **Par défaut** : `src/main/resources/known-artifacts.yaml` (embarqué dans le JAR)
+- **Par défaut** : `src/main/resources/known-artifacts.yaml` (embarqué et mis à jour automatiquement)
 - **Personnalisé** : Spécifier via l'option `-k`
 
 #### Format
 
 ```yaml
 knownArtifacts:
-  # Format simple
-  nom-du-jar.jar:
-    groupId: com.exemple
-    artifactId: mon-artefact
-    version: "1.0.0"
+  # Clé = SHA1 du fichier JAR (40 caractères hexadécimaux)
+  f0a0d2e29ed910808c33135a3a5a51bba6358f7b:
+    groupId: log4j
+    artifactId: log4j
+    version: "1.2.15"
+    jarName: log4j.jar  # Pour référence/documentation
 
-  # Format complet avec scope et note
-  autre-jar.jar:
-    groupId: com.exemple
-    artifactId: autre-artefact
-    version: "2.0.0"
-    scope: test        # compile, provided, runtime, test
-    classifier: jdk8   # optionnel
-    note: "Description ou remarque"
+  # Autre exemple
+  dc6a73fdbd1fa3f0944e8497c6c872fa21dca37e:
+    groupId: commons-digester
+    artifactId: commons-digester
+    version: "1.8"
+    jarName: commons-digester.jar
 ```
 
-#### Exemples de configuration
+#### Obtenir le SHA1 d'un JAR
 
-```yaml
-knownArtifacts:
-  # Bouncy Castle (version dans le nom diffère de Maven)
-  bcprov-jdk15on-166.jar:
-    groupId: org.bouncycastle
-    artifactId: bcprov-jdk15on
-    version: "1.66"
+```bash
+# Linux
+sha1sum mon-fichier.jar
 
-  # Spring Framework
-  spring-core-3.2.18.RELEASE.jar:
-    groupId: org.springframework
-    artifactId: spring-core
-    version: 3.2.18.RELEASE
+# macOS
+shasum -a 1 mon-fichier.jar
 
-  # Dépendance de test
-  junit-4.11.jar:
-    groupId: junit
-    artifactId: junit
-    version: 4.11
-    scope: test
-
-  # Driver Oracle (nécessite téléchargement manuel)
-  classes12.jar:
-    groupId: com.oracle.database.jdbc
-    artifactId: ojdbc8
-    version: 12.2.0.1
-    scope: provided
-    note: "Oracle JDBC - requires manual download from Oracle"
+# Windows (PowerShell)
+Get-FileHash -Algorithm SHA1 mon-fichier.jar
 ```
+
+#### Avantages du cache SHA1
+
+- **Précision** : Le même nom de fichier (ex: `struts.jar`) peut avoir des versions différentes selon les projets. Le SHA1 identifie exactement le binaire.
+- **Performance** : Après la première résolution, les recherches réseau sont évitées.
+- **Partage** : Le fichier peut être partagé entre développeurs/projets pour mutualiser les résolutions.
 
 ### Configuration Artifactory
 
 #### Ordre de résolution des dépendances
 
-1. **Patterns internes** : DEPFAB.*, jk-socle-*, Service*_client.jar, etc.
-2. **Configuration known-artifacts.yaml**
-3. **Artifactory** (si configuré) : Recherche par SHA1
-4. **Maven Central** : Recherche par SHA1
-5. **Pattern matching** : Extraction depuis le nom de fichier
+1. **Cache known-artifacts.yaml** : Recherche par SHA1 (instantané)
+2. **Artifactory** (si configuré) : Recherche par SHA1, puis ajout au cache
+3. **Maven Central** : Recherche par SHA1, puis ajout au cache
+4. **Patterns internes** : DEPFAB.*, jk-socle-*, struts.jar, classes12.jar
+5. **Pattern matching** : Extraction version depuis le nom de fichier
+6. **Fallback** : Génération de coordonnées avec version SHA
 
 #### Certificat SSL
 
@@ -297,12 +291,13 @@ cd projet-maven
 
 ### Phase 2 : Résolution des dépendances
 
-1. Application des patterns internes (DEPFAB.*, jk-socle-*, etc.)
-2. Recherche dans known-artifacts.yaml
-3. Lookup SHA1 sur Artifactory (si configuré)
-4. Lookup SHA1 sur Maven Central
+1. Recherche dans le cache known-artifacts.yaml (par SHA1)
+2. Lookup SHA1 sur Artifactory (si configuré) → ajout au cache si trouvé
+3. Lookup SHA1 sur Maven Central → ajout au cache si trouvé
+4. Application des patterns internes (DEPFAB.*, struts.jar, classes12.jar)
 5. Pattern matching sur le nom de fichier
 6. Génération de versions SHA pour les JARs non résolus
+7. Sauvegarde des nouvelles entrées dans known-artifacts.yaml
 
 ### Phase 3 : Génération du projet Maven
 
@@ -441,9 +436,20 @@ fr.cnam.migration
 
 ## Résolution des dépendances
 
+### Pipeline de résolution
+
+Le système utilise un pipeline en 6 étapes pour résoudre chaque JAR :
+
+1. **Cache SHA1** (known-artifacts.yaml) - Instantané, pas de réseau
+2. **Artifactory SHA1** - Si configuré, résultat ajouté au cache
+3. **Maven Central SHA1** - Résultat ajouté au cache
+4. **Patterns internes** - Pour les JARs propriétaires (DEPFAB.*, struts.jar, etc.)
+5. **Pattern nom de fichier** - Extraction version depuis le nom
+6. **Fallback SHA** - Génération de coordonnées avec version SHA-xxx
+
 ### Patterns internes reconnus
 
-Les JARs correspondant à ces patterns sont considérés comme internes :
+Les JARs correspondant à ces patterns sont traités comme internes :
 
 | Pattern | GroupId généré | Exemple |
 |---------|---------------|---------|
@@ -451,8 +457,8 @@ Les JARs correspondant à ces patterns sont considérés comme internes :
 | `jk-socle-*` | `fr.cnamts.jk.socle` | jk-socle-util-1.2.5.jar |
 | `Service*_client.jar` | `fr.cnamts.services` | ServicePS_3.0.client.jar |
 | `s8*-*.jar` | `fr.cnamts.s8` | s8sp-2.0.3.jar |
-| `S8_J.*` | `fr.cnamts.s8.j` | S8_J.commons-collections4-4.1.jar |
-| `SOCA*` | `fr.cnamts.internal` | SOCA010000J-1.0.0-multipub-pub.jar |
+| `struts.jar` | `org.apache.struts` | Version extraite du MANIFEST |
+| `classes12.jar` | `com.oracle.database.jdbc` | ojdbc8:12.2.0.1 |
 
 ### Lookup SHA1
 
@@ -460,6 +466,18 @@ La recherche par checksum SHA1 permet d'identifier précisément un JAR :
 
 1. **Maven Central** : `https://search.maven.org/solrsearch/select?q=1:<sha1>`
 2. **Artifactory** : `<url>/api/search/checksum?sha1=<sha1>`
+
+### Cache automatique
+
+Lorsqu'un JAR est résolu via Maven Central ou Artifactory, l'entrée est automatiquement ajoutée au fichier `known-artifacts.yaml` :
+
+```
+Première exécution (projet A):
+  log4j.jar (SHA1: f0a0d...) → recherche Maven Central → trouvé → ajouté au cache
+
+Exécutions suivantes (projet A, B, C...):
+  log4j.jar (SHA1: f0a0d...) → trouvé dans cache → pas de recherche réseau
+```
 
 ---
 
@@ -559,6 +577,14 @@ Ce projet est sous licence interne CNAM.
 ---
 
 ## Changelog
+
+### Version 1.2.0
+- **Cache automatique SHA1** : Les résolutions sont sauvegardées dans known-artifacts.yaml
+- **Nouveau format known-artifacts.yaml** : Utilise le SHA1 comme clé (plus précis que le nom de fichier)
+- **Pipeline réordonné** : Cache → Artifactory → Maven Central → Patterns internes
+- Amélioration du rapport HTML avec statistiques cohérentes
+- Correction de l'artifactId pour les JARs extraits des EAR
+- Support des JARs en camelCase (jAuthApp.jar, etc.)
 
 ### Version 1.1.0
 - Ajout de l'intégration Artifactory
