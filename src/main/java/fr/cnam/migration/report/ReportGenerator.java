@@ -535,20 +535,23 @@ public class ReportGenerator {
         // SECTION : Bibliothèques résolues (Maven Central ou Artifactory uniquement)
         // =====================================================================
         // Seules les bibliothèques trouvées sur Maven Central ou Artifactory sont "résolues"
+        // Inclut INTERNAL_PATTERN si les coordonnées ne nécessitent pas d'installation locale
         List<DependencyInfo> trulyResolved = analysis.resolved().stream()
             .filter(d -> d.method() == ResolutionMethod.CHECKSUM ||
                         d.method() == ResolutionMethod.ARTIFACTORY ||
                         d.method() == ResolutionMethod.ARTIFACTORY_CHECKSUM ||
-                        (d.method() == ResolutionMethod.KNOWN_CONFIG && !d.needsLocalInstall()))
+                        (d.method() == ResolutionMethod.KNOWN_CONFIG && !d.needsLocalInstall()) ||
+                        (d.method() == ResolutionMethod.INTERNAL_PATTERN && !d.needsLocalInstall()))
             .toList();
 
         html.append("<h2>Bibliothèques résolues (").append(trulyResolved.size()).append(")</h2>");
         html.append("<p><em>Ces bibliothèques seront téléchargées automatiquement par Maven depuis un dépôt distant.</em></p>");
 
-        // Sous-section : Résolues depuis Maven Central
+        // Sous-section : Résolues depuis Maven Central (inclut patterns internes avec coordonnées Maven valides)
         List<DependencyInfo> resolvedMavenCentral = trulyResolved.stream()
             .filter(d -> d.method() == ResolutionMethod.CHECKSUM ||
-                        (d.method() == ResolutionMethod.KNOWN_CONFIG && !d.needsLocalInstall()))
+                        (d.method() == ResolutionMethod.KNOWN_CONFIG && !d.needsLocalInstall()) ||
+                        (d.method() == ResolutionMethod.INTERNAL_PATTERN && !d.needsLocalInstall()))
             .toList();
 
         if (!resolvedMavenCentral.isEmpty()) {

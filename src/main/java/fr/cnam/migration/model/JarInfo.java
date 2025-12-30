@@ -60,6 +60,23 @@ public record JarInfo(
     }
 
     /**
+     * Retourne le nom original du JAR sans les préfixes de chemin EAR.
+     * Par exemple: "APP-INF_lib_jAuthApp.jar" -> "jAuthApp.jar"
+     */
+    public String originalName() {
+        String cleanName = name;
+        // Supprimer les préfixes courants des chemins EAR
+        if (cleanName.startsWith("APP-INF_lib_")) {
+            cleanName = cleanName.substring("APP-INF_lib_".length());
+        } else if (cleanName.startsWith("WEB-INF_lib_")) {
+            cleanName = cleanName.substring("WEB-INF_lib_".length());
+        } else if (cleanName.startsWith("lib_")) {
+            cleanName = cleanName.substring("lib_".length());
+        }
+        return cleanName;
+    }
+
+    /**
      * Builder pour construire un JarInfo.
      */
     public static class Builder {

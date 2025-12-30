@@ -108,14 +108,16 @@ public class DependencyAnalyzer {
     private ResolutionContext resolveJar(JarInfo jar) {
         List<AnalysisResult.ResolutionAttempt> attempts = new ArrayList<>();
 
-        // Stratégie 1 : Vérifier la configuration des artefacts connus EN PREMIER
-        // Ces mappings sont fiables et permettent d'utiliser les coordonnées Maven Central
-        Optional<MavenCoordinate> known = knownArtifacts.lookup(jar.name());
-        if (known.isPresent()) {
-            attempts.add(AnalysisResult.ResolutionAttempt.success(
-                ResolutionMethod.KNOWN_CONFIG, known.get()));
-            log.debug("Resolved from known artifacts: {} -> {}", jar.name(), known.get().toGav());
-            return ResolutionContext.resolved(known.get(), ResolutionMethod.KNOWN_CONFIG, attempts);
+        // Stratégie 1 : Vérifier la configuration des artefacts connus EN PREMIER (par SHA1)
+        // Ces mappings sont fiables car basés sur le checksum exact du JAR
+        if (jar.sha1() != null) {
+            Optional<MavenCoordinate> known = knownArtifacts.lookupBySha1(jar.sha1());
+            if (known.isPresent()) {
+                attempts.add(AnalysisResult.ResolutionAttempt.success(
+                    ResolutionMethod.KNOWN_CONFIG, known.get()));
+                log.debug("Resolved from known artifacts by SHA1: {} -> {}", jar.name(), known.get().toGav());
+                return ResolutionContext.resolved(known.get(), ResolutionMethod.KNOWN_CONFIG, attempts);
+            }
         }
         attempts.add(AnalysisResult.ResolutionAttempt.failed(
             ResolutionMethod.KNOWN_CONFIG, "Not in known artifacts"));

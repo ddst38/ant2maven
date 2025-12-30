@@ -232,35 +232,51 @@ public class InternalArtifactPatterns {
     }
 
     /**
-     * Vérifie si un nom de JAR correspond à un pattern interne.
+     * Vérifie si un nom de JAR correspond à un pattern interne SPÉCIFIQUE.
+     * Ne retourne true que pour les artefacts internes bien identifiés.
+     * Les JARs génériques (log4j.jar, antlr.jar, etc.) retournent false
+     * pour permettre la recherche sur Maven Central.
      */
     public boolean isInternal(String jarName) {
-        // Préfixes internes courants
-        if (jarName.startsWith("DEPFAB.") ||
-            jarName.startsWith("jk-socle-") ||
-            jarName.matches("^[A-Z]+_[A-Z]\\..*") ||  // XXX_Y.something
-            jarName.matches("^s8[a-z]?-.*") ||         // s8xxx- or s8h-xxx
-            jarName.matches("^Service[A-Z]+_.*") ||    // ServiceXXX_
-            jarName.matches("^[A-Z]+\\d{6,}.*\\.jar$")) {  // Codes projet comme SOCA010000J
+        // Nettoyer les préfixes EAR si présents
+        String cleanName = jarName;
+        if (cleanName.startsWith("APP-INF_lib_")) {
+            cleanName = cleanName.substring("APP-INF_lib_".length());
+        } else if (cleanName.startsWith("WEB-INF_lib_")) {
+            cleanName = cleanName.substring("WEB-INF_lib_".length());
+        } else if (cleanName.startsWith("lib_")) {
+            cleanName = cleanName.substring("lib_".length());
+        }
+
+        // Préfixes internes courants (patterns spécifiques CNAM)
+        if (cleanName.startsWith("DEPFAB.") ||
+            cleanName.startsWith("jk-socle-") ||
+            cleanName.matches("^[A-Z]+_[A-Z]\\..*") ||  // XXX_Y.something
+            cleanName.matches("^s8[a-z]?-.*") ||         // s8xxx- or s8h-xxx
+            cleanName.matches("^Service[A-Z]+_.*") ||    // ServiceXXX_
+            cleanName.matches("^[A-Z]+\\d{6,}.*\\.jar$")) {  // Codes projet comme SOCA010000J
             return true;
         }
 
-        // Vérifier les patterns spécifiques
-        for (InternalPattern pattern : patterns) {
-            if (pattern.pattern.matcher(jarName).matches()) {
-                return true;
-            }
+        // Cas spécifiques bien connus qui ont un mapping Maven
+        if (cleanName.equals("struts.jar") || cleanName.equals("classes12.jar")) {
+            return true;
         }
 
+        // NE PAS matcher le pattern générique ici - cela empêcherait
+        // la recherche Maven Central pour les JARs standards
         return false;
     }
 
     /**
      * Tente de résoudre un JAR en coordonnées Maven en utilisant les patterns internes.
+     * Utilise le nom original du JAR (sans préfixes EAR) pour le matching.
      */
     public Optional<MavenCoordinate> resolve(JarInfo jar) {
+        // Utiliser le nom original sans les préfixes de chemin EAR
+        String jarName = jar.originalName();
         for (InternalPattern pattern : patterns) {
-            Matcher matcher = pattern.pattern.matcher(jar.name());
+            Matcher matcher = pattern.pattern.matcher(jarName);
             if (matcher.matches()) {
                 try {
                     MavenCoordinate coord = pattern.resolver.resolve(matcher, jar);
