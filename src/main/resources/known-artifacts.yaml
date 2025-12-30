@@ -48,3 +48,129 @@ knownArtifacts:
   #   jarName: classes12.jar
   #   scope: provided
   #   note: "Oracle JDBC - requires manual download from Oracle"
+
+  # log4j.jar
+  f0a0d2e29ed910808c33135a3a5a51bba6358f7b:
+    groupId: log4j
+    artifactId: log4j
+    version: "1.2.15"
+    jarName: log4j.jar
+
+  # commons-digester.jar
+  dc6a73fdbd1fa3f0944e8497c6c872fa21dca37e:
+    groupId: commons-digester
+    artifactId: commons-digester
+    version: "1.8"
+    jarName: commons-digester.jar
+
+  # commons-fileupload.jar
+  d587a50727ba905aad13de9ea119081403bf6823:
+    groupId: commons-fileupload
+    artifactId: commons-fileupload
+    version: "1.1.1"
+    jarName: commons-fileupload.jar
+
+  # commons-logging.jar
+  5043bfebc3db072ed80fbd362e7caf00e885d8ae:
+    groupId: commons-logging
+    artifactId: commons-logging
+    version: "1.1.1"
+    jarName: commons-logging.jar
+
+  # commons-validator.jar
+  d1fd6b1510f25e827adffcf17de3c85fa00e9391:
+    groupId: commons-validator
+    artifactId: commons-validator
+    version: "1.3.1"
+    jarName: commons-validator.jar
+
+  # antlr.jar
+  546b5220622c4d9b2da45ad1899224b6ce1c8830:
+    groupId: antlr
+    artifactId: antlrall
+    version: "2.7.2"
+    jarName: antlr.jar
+
+  # struts-el.jar
+  dc4ffd38330f08966cd226fb36b74e73d0d03ef0:
+    groupId: org.apache.struts
+    artifactId: struts-el
+    version: "1.3.8"
+    jarName: struts-el.jar
+
+  # struts-scripting.jar
+  eedac8a63b86fe48c9220c45358e969ed2077879:
+    groupId: org.apache.struts
+    artifactId: struts-scripting
+    version: "1.3.8"
+    jarName: struts-scripting.jar
+
+  # commons-beanutils.jar
+  5675fd96b29656504b86029551973d60fb41339b:
+    groupId: commons-beanutils
+    artifactId: commons-beanutils
+    version: "1.7.0"
+    jarName: commons-beanutils.jar
+
+  # bsf.jar
+  b6be87b58571101e95525228cf23e934b4eabe35:
+    groupId: bsf
+    artifactId: bsf
+    version: "2.3.0-rc1"
+    jarName: bsf.jar
+
+  # oro.jar
+  5592374f834645c4ae250f4c9fbb314c9369d698:
+    groupId: oro
+    artifactId: oro
+    version: "2.0.8"
+    jarName: oro.jar
+
+  # struts-core.jar
+  66178d4a9279ebb1cd1eb79c10dc204b4199f061:
+    groupId: org.apache.struts
+    artifactId: struts-core
+    version: "1.3.8"
+    jarName: struts-core.jar
+
+  # struts-taglib.jar
+  e87e9817bdf03c2367fb5f6d5ead953db2df4c21:
+    groupId: org.apache.struts
+    artifactId: struts-taglib
+    version: "1.3.8"
+    jarName: struts-taglib.jar
+
+  # struts-tiles.jar
+  6d212f8ea5d908bc9906e669428b7694dff60785:
+    groupId: org.apache.struts
+    artifactId: struts-tiles
+    version: "1.3.8"
+    jarName: struts-tiles.jar
+
+  # struts.jar
+  ff42429be501755b5aa8ede838fd5b536ea9ea3c:
+    groupId: struts
+    artifactId: struts
+    version: "1.0.2"
+    jarName: struts.jar
+
+  # commons-chain.jar
+  3038bd41dcdb2b63b8c6dcc8c15f0fdf3f389012:
+    groupId: commons-chain
+    artifactId: commons-chain
+    version: "1.1"
+    jarName: commons-chain.jar
+
+  # jstl.jar
+  d494cf539682127ec637157b8529111ca365a67b:
+    groupId: javax.servlet
+    artifactId: jstl
+    version: "1.0.2"
+    jarName: jstl.jar
+
+  # struts-extras.jar
+  3e8f4ed4361dbcf76d6445c86fb4ed4c2c51e016:
+    groupId: org.apache.struts
+    artifactId: struts-extras
+    version: "1.3.8"
+    jarName: struts-extras.jar

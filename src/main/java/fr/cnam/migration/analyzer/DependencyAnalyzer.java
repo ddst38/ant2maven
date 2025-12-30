@@ -14,11 +14,15 @@ import java.util.stream.Collectors;
  * Analyse les dépendances du projet et les résout en coordonnées Maven.
  *
  * Pipeline de résolution (dans l'ordre) :
- * 1. Patterns d'artefacts internes (DEPFAB.*, jk-socle-*, etc.)
- * 2. Configuration des artefacts connus
- * 3. Recherche Artifactory par SHA1 (si configuré)
- * 4. Recherche Maven Central par SHA1
+ * 1. Configuration des artefacts connus (known-artifacts.yaml par SHA1)
+ * 2. Recherche Artifactory par SHA1 (si configuré)
+ * 3. Recherche Maven Central par SHA1
+ * 4. Patterns d'artefacts internes (DEPFAB.*, jk-socle-*, struts.jar, classes12.jar)
  * 5. Correspondance de pattern sur nom de fichier avec vérification
+ * 6. Génération de coordonnées avec version SHA pour les non résolus
+ *
+ * Les résolutions via Artifactory ou Maven Central sont automatiquement
+ * enregistrées dans known-artifacts.yaml pour les prochaines exécutions.
  */
 public class DependencyAnalyzer {
 
@@ -92,24 +96,30 @@ public class DependencyAnalyzer {
         }
         log.info("Maven Central cache stats: {}", mavenCentral.getCacheStats());
 
+        // Sauvegarder les nouvelles entrées dans known-artifacts.yaml
+        int savedCount = knownArtifacts.saveNewEntries();
+        if (savedCount > 0) {
+            log.info("Saved {} new entries to known-artifacts.yaml", savedCount);
+        }
+
         return new AnalysisResult(resolved, unresolved);
     }
 
     /**
      * Tente de résoudre un seul JAR en utilisant le pipeline de résolution.
      *
-     * L'ordre de résolution est important :
-     * 1. known-artifacts.yaml EN PREMIER (coordonnées Maven Central vérifiées)
-     * 2. Patterns internes (pour les vrais artefacts propriétaires CNAM)
-     * 3. Artifactory par SHA1
-     * 4. Maven Central par SHA1
-     * 5. Correspondance de pattern par nom de fichier
+     * L'ordre de résolution :
+     * 1. known-artifacts.yaml (cache des résolutions précédentes par SHA1)
+     * 2. Artifactory par SHA1
+     * 3. Maven Central par SHA1
+     * 4. Patterns internes (DEPFAB.*, struts.jar, classes12.jar, etc.)
+     * 5. Correspondance de pattern sur nom de fichier
+     * 6. Fallback: génération de coordonnées avec version SHA
      */
     private ResolutionContext resolveJar(JarInfo jar) {
         List<AnalysisResult.ResolutionAttempt> attempts = new ArrayList<>();
 
-        // Stratégie 1 : Vérifier la configuration des artefacts connus EN PREMIER (par SHA1)
-        // Ces mappings sont fiables car basés sur le checksum exact du JAR
+        // Stratégie 1 : Vérifier le cache known-artifacts.yaml (par SHA1)
         if (jar.sha1() != null) {
             Optional<MavenCoordinate> known = knownArtifacts.lookupBySha1(jar.sha1());
             if (known.isPresent()) {
@@ -122,7 +132,39 @@ public class DependencyAnalyzer {
         attempts.add(AnalysisResult.ResolutionAttempt.failed(
             ResolutionMethod.KNOWN_CONFIG, "Not in known artifacts"));
 
-        // Stratégie 2 : Vérifier si c'est un artefact interne (patterns propriétaires CNAM)
+        // Stratégie 2 : Recherche Artifactory par SHA1
+        if (config.isArtifactoryConfigured() && jar.sha1() != null) {
+            Optional<MavenCoordinate> fromArtifactory = artifactoryClient.searchBySha1(jar.sha1());
+            if (fromArtifactory.isPresent()) {
+                MavenCoordinate coord = fromArtifactory.get();
+                attempts.add(AnalysisResult.ResolutionAttempt.success(
+                    ResolutionMethod.ARTIFACTORY_CHECKSUM, coord));
+                log.debug("Resolved from Artifactory by SHA1: {} -> {}", jar.name(), coord.toGav());
+                // Enregistrer dans known-artifacts.yaml pour les prochaines exécutions
+                knownArtifacts.addEntry(jar.sha1(), coord, jar.originalName());
+                return ResolutionContext.resolved(coord, ResolutionMethod.ARTIFACTORY_CHECKSUM, attempts);
+            }
+            attempts.add(AnalysisResult.ResolutionAttempt.failed(
+                ResolutionMethod.ARTIFACTORY_CHECKSUM, "Not found on Artifactory"));
+        }
+
+        // Stratégie 3 : Recherche Maven Central par SHA1
+        if (!config.skipMavenCentralLookup() && jar.sha1() != null) {
+            Optional<MavenCoordinate> bySha1 = mavenCentral.searchBySha1(jar.sha1());
+            if (bySha1.isPresent()) {
+                MavenCoordinate coord = bySha1.get();
+                attempts.add(AnalysisResult.ResolutionAttempt.success(
+                    ResolutionMethod.CHECKSUM, coord));
+                log.debug("Resolved by SHA1 on Maven Central: {} -> {}", jar.name(), coord.toGav());
+                // Enregistrer dans known-artifacts.yaml pour les prochaines exécutions
+                knownArtifacts.addEntry(jar.sha1(), coord, jar.originalName());
+                return ResolutionContext.resolved(coord, ResolutionMethod.CHECKSUM, attempts);
+            }
+            attempts.add(AnalysisResult.ResolutionAttempt.failed(
+                ResolutionMethod.CHECKSUM, "Not found on Maven Central"));
+        }
+
+        // Stratégie 4 : Patterns internes (DEPFAB.*, struts.jar, classes12.jar, etc.)
         if (internalPatterns.isInternal(jar.name())) {
             Optional<MavenCoordinate> coord = internalPatterns.resolve(jar);
             if (coord.isPresent()) {
@@ -131,34 +173,8 @@ public class DependencyAnalyzer {
             }
         }
 
-        // Stratégie 3 : Recherche Artifactory par SHA1 (EN PREMIER, avant Maven Central)
-        if (config.isArtifactoryConfigured() && jar.sha1() != null) {
-            Optional<MavenCoordinate> fromArtifactory = artifactoryClient.searchBySha1(jar.sha1());
-            if (fromArtifactory.isPresent()) {
-                attempts.add(AnalysisResult.ResolutionAttempt.success(
-                    ResolutionMethod.ARTIFACTORY_CHECKSUM, fromArtifactory.get()));
-                log.debug("Resolved from Artifactory by SHA1: {} -> {}", jar.name(), fromArtifactory.get().toGav());
-                return ResolutionContext.resolved(fromArtifactory.get(), ResolutionMethod.ARTIFACTORY_CHECKSUM, attempts);
-            }
-            attempts.add(AnalysisResult.ResolutionAttempt.failed(
-                ResolutionMethod.ARTIFACTORY_CHECKSUM, "Not found on Artifactory"));
-        }
-
-        // Stratégie 4 : Recherche Maven Central par SHA1
-        if (!config.skipMavenCentralLookup() && jar.sha1() != null) {
-            Optional<MavenCoordinate> bySha1 = mavenCentral.searchBySha1(jar.sha1());
-            if (bySha1.isPresent()) {
-                attempts.add(AnalysisResult.ResolutionAttempt.success(
-                    ResolutionMethod.CHECKSUM, bySha1.get()));
-                log.debug("Resolved by SHA1 on Maven Central: {} -> {}", jar.name(), bySha1.get().toGav());
-                return ResolutionContext.resolved(bySha1.get(), ResolutionMethod.CHECKSUM, attempts);
-            }
-            attempts.add(AnalysisResult.ResolutionAttempt.failed(
-                ResolutionMethod.CHECKSUM, "Not found on Maven Central"));
-        }
-
-        // Stratégie 5 : Correspondance de pattern sur nom de fichier avec vérification Artifactory/Maven Central
-        Optional<MavenCoordinate> fromPattern = patternMatcher.match(jar.name());
+        // Stratégie 5 : Correspondance de pattern sur nom de fichier avec vérification
+        Optional<MavenCoordinate> fromPattern = patternMatcher.match(jar.originalName());
         if (fromPattern.isPresent()) {
             MavenCoordinate coord = fromPattern.get();
 
@@ -167,6 +183,10 @@ public class DependencyAnalyzer {
                 attempts.add(AnalysisResult.ResolutionAttempt.success(
                     ResolutionMethod.ARTIFACTORY, coord));
                 log.debug("Resolved by pattern, verified on Artifactory: {} -> {}", jar.name(), coord.toGav());
+                // Enregistrer dans known-artifacts.yaml
+                if (jar.sha1() != null) {
+                    knownArtifacts.addEntry(jar.sha1(), coord, jar.originalName());
+                }
                 return ResolutionContext.resolved(coord, ResolutionMethod.ARTIFACTORY, attempts);
             }
 
@@ -176,6 +196,10 @@ public class DependencyAnalyzer {
                 attempts.add(AnalysisResult.ResolutionAttempt.success(
                     ResolutionMethod.PATTERN, coord));
                 log.debug("Resolved by pattern: {} -> {}", jar.name(), coord.toGav());
+                // Enregistrer dans known-artifacts.yaml
+                if (jar.sha1() != null) {
+                    knownArtifacts.addEntry(jar.sha1(), coord, jar.originalName());
+                }
                 return ResolutionContext.resolved(coord, ResolutionMethod.PATTERN, attempts);
             }
 
@@ -185,6 +209,10 @@ public class DependencyAnalyzer {
             attempts.add(AnalysisResult.ResolutionAttempt.failed(
                 ResolutionMethod.PATTERN, "No pattern matched"));
         }
+
+        // Stratégie 6 : Fallback - génération de coordonnées via pattern générique
+        // Cela sera géré par le code appelant qui utilise internalPatterns.resolve()
+        // pour les JARs non résolus
 
         log.debug("Failed to resolve: {}", jar.name());
         return ResolutionContext.unresolved(attempts);
