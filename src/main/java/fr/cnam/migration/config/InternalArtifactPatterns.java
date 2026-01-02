@@ -81,14 +81,15 @@ public class InternalArtifactPatterns {
             )
         ));
 
-        // DEPFAB.XXX_Y-version-suffix.jar -> {basePackage}.internal:xxx_y:version
+        // DEPFAB.XXX_Y-version-suffix.jar -> {basePackage}.internal:xxx_y:SHA-{sha1}
         // Exemple : DEPFAB.BIMC_H-1.0.16-st3.0-rhel7-wls12cr2-pub.jar
+        // Utilise SHA1 car ces JARs internes ne sont pas sur Maven Central
         patterns.add(new InternalPattern(
             Pattern.compile("^DEPFAB\\.([A-Z0-9]+_[A-Z])-(\\d+\\.\\d+\\.\\d+)-.+\\.jar$"),
             (m, jar) -> new MavenCoordinate(
                 basePackage + ".internal",
                 m.group(1).toLowerCase(),
-                m.group(2)
+                jar.sha1() != null ? "SHA-" + jar.sha1() : "UNKNOWN"
             )
         ));
 
@@ -137,34 +138,37 @@ public class InternalArtifactPatterns {
             }
         ));
 
-        // jk-socle-XXX-version.jar -> {basePackage}.jk.socle:jk-socle-xxx:version
+        // jk-socle-XXX-version.jar -> {basePackage}.jk.socle:jk-socle-xxx:SHA-{sha1}
+        // Utilise SHA1 car ces JARs internes ne sont pas sur Maven Central
         patterns.add(new InternalPattern(
             Pattern.compile("^(jk-socle-[a-z-]+)-(\\d+\\.\\d+\\.\\d+)\\.jar$"),
             (m, jar) -> new MavenCoordinate(
                 basePackage + ".jk.socle",
                 m.group(1),
-                m.group(2)
+                jar.sha1() != null ? "SHA-" + jar.sha1() : "UNKNOWN"
             )
         ));
 
-        // XXX_Y.library-version.jar -> {basePackage}.xxx:library:version
+        // XXX_Y.library-version.jar -> {basePackage}.xxx:library:SHA-{sha1}
         // Exemple : S8_J.commons-collections4-4.1.jar
+        // Utilise SHA1 car ces JARs internes ne sont pas sur Maven Central
         patterns.add(new InternalPattern(
             Pattern.compile("^([A-Z0-9]+_[A-Z])\\.(.+)-(\\d+\\.\\d+(?:\\.\\d+)?)\\.jar$"),
             (m, jar) -> new MavenCoordinate(
                 basePackage + "." + m.group(1).toLowerCase().replace("_", "."),
                 m.group(2),
-                m.group(3)
+                jar.sha1() != null ? "SHA-" + jar.sha1() : "UNKNOWN"
             )
         ));
 
-        // s8XXX-version.jar or s8h-XXX-version.jar -> {basePackage}.s8:s8xxx:version
+        // s8XXX-version.jar or s8h-XXX-version.jar -> {basePackage}.s8:s8xxx:SHA-{sha1}
+        // Utilise SHA1 car ces JARs internes ne sont pas sur Maven Central
         patterns.add(new InternalPattern(
             Pattern.compile("^(s8[a-z]?-?[a-zA-Z]*)-(\\d+\\.\\d+\\.\\d+)\\.jar$"),
             (m, jar) -> new MavenCoordinate(
                 basePackage + ".s8",
                 m.group(1),
-                m.group(2)
+                jar.sha1() != null ? "SHA-" + jar.sha1() : "UNKNOWN"
             )
         ));
 
@@ -180,14 +184,15 @@ public class InternalArtifactPatterns {
             )
         ));
 
-        // Codes projet SOCA ou similaires : XXXNNNNNNNY-version-suffix.jar
+        // Codes projet SOCA ou similaires : XXXNNNNNNNY-version-suffix.jar -> SHA-{sha1}
         // Exemple : SOCA010000J-1.0.0-multipub-pub.jar
+        // Utilise SHA1 car ces JARs internes ne sont pas sur Maven Central
         patterns.add(new InternalPattern(
             Pattern.compile("^([A-Z]+\\d+[A-Z])-(\\d+\\.\\d+\\.\\d+)-.+\\.jar$"),
             (m, jar) -> new MavenCoordinate(
                 basePackage + ".internal",
                 m.group(1).toLowerCase(),
-                m.group(2)
+                jar.sha1() != null ? "SHA-" + jar.sha1() : "UNKNOWN"
             )
         ));
 

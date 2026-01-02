@@ -55,11 +55,32 @@ public class CompilationErrorParser {
         "error:.*import ([\\w.]+)"
     );
 
+    // === Patterns pour erreurs de RÉSOLUTION Maven (phase 1) ===
+
+    // Pattern pour erreurs de résolution d'artefacts Maven
+    // Format: "artifacts could not be resolved: groupId:artifactId:jar:version, ..."
+    private static final Pattern ARTIFACT_NOT_RESOLVED = Pattern.compile(
+        "artifacts? could not be resolved:\\s*(.+?)(?:->|$)",
+        Pattern.CASE_INSENSITIVE
+    );
+
+    // Pattern pour extraire chaque coordonnée Maven
+    private static final Pattern ARTIFACT_COORD = Pattern.compile(
+        "([\\w.-]+):([\\w.-]+):jar:([\\w.-]+)"
+    );
+
     /**
      * Parse la sortie de compilation et extrait les dependances manquantes.
+     * Detecte les erreurs de RESOLUTION Maven (phase 1) et de COMPILATION javac (phase 2).
      */
     public Set<MissingDependency> parse(String compilerOutput) {
         Set<MissingDependency> missing = new HashSet<>();
+
+        // 1. Parser les erreurs de RÉSOLUTION Maven (phase 1)
+        //    Ces erreurs empêchent la compilation de démarrer
+        missing.addAll(parseArtifactResolutionErrors(compilerOutput));
+
+        // 2. Parser les erreurs de COMPILATION javac (phase 2)
         String currentSourceFile = null;
 
         // Traiter ligne par ligne pour capturer le fichier source
@@ -167,5 +188,40 @@ public class CompilationErrorParser {
             }
         }
         return count;
+    }
+
+    /**
+     * Parse les erreurs de résolution d'artefacts Maven (phase 1).
+     * Ces erreurs surviennent AVANT la compilation javac, quand Maven
+     * ne peut pas télécharger/trouver les dépendances déclarées dans le POM.
+     *
+     * Format d'erreur:
+     * [ERROR] Could not resolve dependencies... The following artifacts could not be resolved:
+     * fr.cnamts.internal:bimc_h:jar:1.0.16, fr.cnamts.jk.socle:jk-socle-util:jar:1.2.5, ...
+     *
+     * @param output La sortie complète de Maven
+     * @return Les dépendances manquantes détectées (groupId utilisé comme package)
+     */
+    private Set<MissingDependency> parseArtifactResolutionErrors(String output) {
+        Set<MissingDependency> errors = new HashSet<>();
+
+        Matcher matcher = ARTIFACT_NOT_RESOLVED.matcher(output);
+        while (matcher.find()) {
+            String artifactsList = matcher.group(1);
+            Matcher coordMatcher = ARTIFACT_COORD.matcher(artifactsList);
+            while (coordMatcher.find()) {
+                String groupId = coordMatcher.group(1);
+                String artifactId = coordMatcher.group(2);
+                // Utiliser groupId comme package pour compatibilité avec résolution lib-provided
+                errors.add(new MissingDependency(Type.PACKAGE, groupId, null));
+                log.debug("Artefact Maven non résolu: {}:{}", groupId, artifactId);
+            }
+        }
+
+        if (!errors.isEmpty()) {
+            log.info("Erreurs résolution Maven détectées: {} artefacts manquants", errors.size());
+        }
+
+        return errors;
     }
 }

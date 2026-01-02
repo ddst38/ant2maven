@@ -1056,3 +1056,451 @@ knownArtifacts:
     artifactId: eclipselink
     version: "2.5.2"
     jarName: eclipselink.jar
+
+  # spring-test-3.2.18.RELEASE.jar
+  93351ad841eb73899e2fa8f17f0f55f7346198c9:
+    groupId: org.springframework
+    artifactId: spring-test
+    version: "3.2.18.RELEASE"
+    jarName: spring-test-3.2.18.RELEASE.jar
+
+  # commons-configuration2-2.4.jar
+  208279841cb092e0f51f097c1f1649341e6333f3:
+    groupId: org.apache.commons
+    artifactId: commons-configuration2
+    version: "2.4"
+    jarName: commons-configuration2-2.4.jar
+
+  # bcmail-jdk15on-166.jar
+  d9a53ea560d3c8f835a811e8bed7114b42b8a4df:
+    groupId: org.bouncycastle
+    artifactId: bcmail-jdk15on
+    version: "1.66"
+    jarName: bcmail-jdk15on-166.jar
+
+  # spring-core-3.2.18.RELEASE.jar
+  0e2bd9c162280cd79c2ea0f67f174ee5d7b84ddd:
+    groupId: org.springframework
+    artifactId: spring-core
+    version: "3.2.18.RELEASE"
+    jarName: spring-core-3.2.18.RELEASE.jar
+
+  # spring-context-3.2.18.RELEASE.jar
+  e8dc9e1b55bfb6ad5ad49b358d5ca6e3d4cd7488:
+    groupId: org.springframework
+    artifactId: spring-context
+    version: "3.2.18.RELEASE"
+    jarName: spring-context-3.2.18.RELEASE.jar
+
+  # log4j-api-2.17.1.jar
+  104975c9e5d534eaa97cde844186d42224146e3e:
+    groupId: org.apache.logging.log4j
+    artifactId: log4j-api
+    version: "2.17.1"
+    jarName: log4j-api-2.17.1.jar
+
+  # slf4j-api-1.7.30.jar
+  b5a4b6d16ab13e34a88fae84c35cd5d68cac922c:
+    groupId: org.slf4j
+    artifactId: slf4j-api
+    version: "1.7.30"
+    jarName: slf4j-api-1.7.30.jar
+
+  # commons-configuration-1.10.jar
+  2b36e4adfb66d966c5aef2d73deb6be716389dc9:
+    groupId: commons-configuration
+    artifactId: commons-configuration
+    version: "1.10"
+    jarName: commons-configuration-1.10.jar
+
+  # S8_J.commons-collections4-4.1.jar
+  a4cf4688fe1c7e3a63aa636cc96d013af537768e:
+    groupId: org.apache.commons
+    artifactId: commons-collections4
+    version: "4.1"
+    jarName: S8_J.commons-collections4-4.1.jar
+
+  # commons-logging-1.1.3.jar
+  f6f66e966c70a83ffbdb6f17a0919eaf7c8aca7f:
+    groupId: commons-logging
+    artifactId: commons-logging
+    version: "1.1.3"
+    jarName: commons-logging-1.1.3.jar
+
+  # log4j-1.2-api-2.17.1.jar
+  fc93b9bf4ac1b36c0dad8be55ef38564dc7dbead:
+    groupId: org.apache.logging.log4j
+    artifactId: log4j-1.2-api
+    version: "2.17.1"
+    jarName: log4j-1.2-api-2.17.1.jar
+
+  # spring-expression-3.2.18.RELEASE.jar
+  070c1fb9f2111601193e01a8d0c3ccbca1bf3706:
+    groupId: org.springframework
+    artifactId: spring-expression
+    version: "3.2.18.RELEASE"
+    jarName: spring-expression-3.2.18.RELEASE.jar
+
+  # postgresql-42.2.5.jar
+  951b7eda125f3137538a94e2cbdcf744088ad4c2:
+    groupId: org.postgresql
+    artifactId: postgresql
+    version: "42.2.5"
+    jarName: postgresql-42.2.5.jar
+
+  # spring-aop-3.2.18.RELEASE.jar
+  bf3bd91214a6d0b4c4daeefbe3fcf008d9e3a368:
+    groupId: org.springframework
+    artifactId: spring-aop
+    version: "3.2.18.RELEASE"
+    jarName: spring-aop-3.2.18.RELEASE.jar
+
+  # log4j-core-2.17.1.jar
+  b4f4bca901f131ebe53fef183645181f5deef2f0:
+    groupId: org.apache.logging.log4j
+    artifactId: log4j-core
+    version: "2.17.1"
+    jarName: log4j-core-2.17.1.jar
+
+  # jackson-annotations-2.9.0.jar
+  07c10d545325e3a6e72e06381afe469fd40eb701:
+    groupId: com.fasterxml.jackson.core
+    artifactId: jackson-annotations
+    version: "2.9.0"
+    jarName: jackson-annotations-2.9.0.jar
+
+  # log4j-slf4j-impl-2.17.1.jar
+  8bfdf3e236ce1be440ce258450023a29b9feea6b:
+    groupId: org.apache.logging.log4j
+    artifactId: log4j-slf4j-impl
+    version: "2.17.1"
+    jarName: log4j-slf4j-impl-2.17.1.jar
+
+  # commons-codec-1.9.jar
+  9ce04e34240f674bc72680f8b843b1457383161a:
+    groupId: commons-codec
+    artifactId: commons-codec
+    version: "1.9"
+    jarName: commons-codec-1.9.jar
+
+  # bcpkix-jdk15on-166.jar
+  86cca2c1a32775abe92316d9628b7ee50b6f19ad:
+    groupId: org.bouncycastle
+    artifactId: bcpkix-jdk15on
+    version: "1.66"
+    jarName: bcpkix-jdk15on-166.jar
+
+  # bcprov-ext-jdk15on-166.jar
+  5cfd52b3c4af7f3bfc6fccda1c2463d2f0a73888:
+    groupId: org.bouncycastle
+    artifactId: bcprov-ext-jdk15on
+    version: "1.66"
+    jarName: bcprov-ext-jdk15on-166.jar
+
+  # jaxb-api-2.3.0.jar
+  99f802e0cb3e953ba3d6e698795c4aeb98d37c48:
+    groupId: javax.xml.bind
+    artifactId: jaxb-api
+    version: "2.3.0"
+    jarName: jaxb-api-2.3.0.jar
+
+  # jaxws-api-2.3.0.jar
+  82db2dfe70624d6ed1e93737abfbb0a4df084a89:
+    groupId: javax.xml.ws
+    artifactId: jaxws-api
+    version: "2.3.0"
+    jarName: jaxws-api-2.3.0.jar
+
+  # tomcat-juli-7.0.54.jar
+  b1ab768678cb729831ed6ae926a90ab6f0974a60:
+    groupId: org.apache.tomcat
+    artifactId: tomcat-juli
+    version: "7.0.54"
+    jarName: tomcat-juli-7.0.54.jar
+
+  # jackson-core-asl-1.9.13.jar
+  3c304d70f42f832e0a86d45bd437f692129299a4:
+    groupId: org.codehaus.jackson
+    artifactId: jackson-core-asl
+    version: "1.9.13"
+    jarName: jackson-core-asl-1.9.13.jar
+
+  # joda-time-2.3.jar
+  56498efd17752898cfcc3868c1b6211a07b12b8f:
+    groupId: joda-time
+    artifactId: joda-time
+    version: "2.3"
+    jarName: joda-time-2.3.jar
+
+  # bcpg-jdk15on-166.jar
+  b4895a77bb3381407663154739abccd52f21818a:
+    groupId: org.bouncycastle
+    artifactId: bcpg-jdk15on
+    version: "1.66"
+    jarName: bcpg-jdk15on-166.jar
+
+  # spring-jdbc-3.2.18.RELEASE.jar
+  ff23752b5d75c96ffa6b3ec5055cbc07ed8f0675:
+    groupId: org.springframework
+    artifactId: spring-jdbc
+    version: "3.2.18.RELEASE"
+    jarName: spring-jdbc-3.2.18.RELEASE.jar
+
+  # tomcat-jdbc-7.0.54.jar
+  c325fb6d376df8bb34de0252aef2f7472658d4d7:
+    groupId: org.apache.tomcat
+    artifactId: tomcat-jdbc
+    version: "7.0.54"
+    jarName: tomcat-jdbc-7.0.54.jar
+
+  # commons-codec-1.3.jar
+  fd32786786e2adb664d5ecc965da47629dca14ba:
+    groupId: net.sf.ingenias
+    artifactId: common-codec
+    version: "1.3"
+    jarName: commons-codec-1.3.jar
+
+  # metrics-core-3.0.2.jar
+  c6a7fb32776e984b64ff1a548e3044238ea5a931:
+    groupId: com.codahale.metrics
+    artifactId: metrics-core
+    version: "3.0.2"
+    jarName: metrics-core-3.0.2.jar
+
+  # commons-collections-3.2.1.jar
+  761ea405b9b37ced573d2df0d1e3a4e0f9edc668:
+    groupId: commons-collections
+    artifactId: commons-collections
+    version: "3.2.1"
+    jarName: commons-collections-3.2.1.jar
+
+  # spring-beans-3.2.18.RELEASE.jar
+  4c0bb7e1a69d650145e8e08a3bcc03a8bc3c453e:
+    groupId: org.springframework
+    artifactId: spring-beans
+    version: "3.2.18.RELEASE"
+    jarName: spring-beans-3.2.18.RELEASE.jar
+
+  # commons-lang-2.6.jar
+  0ce1edb914c94ebc388f086c6827e8bdeec71ac2:
+    groupId: org.netbeans.external
+    artifactId: org-apache-commons-lang
+    version: "RELEASE113"
+    jarName: commons-lang-2.6.jar
+
+  # commons-text-1.6.jar
+  ba72cf0c40cf701e972fe7720ae844629f4ecca2:
+    groupId: org.apache.commons
+    artifactId: commons-text
+    version: "1.6"
+    jarName: commons-text-1.6.jar
+
+  # spring-web-3.2.18.RELEASE.jar
+  bc0bdade0a7a52b8fae88e1febc8479383a2acad:
+    groupId: org.springframework
+    artifactId: spring-web
+    version: "3.2.18.RELEASE"
+    jarName: spring-web-3.2.18.RELEASE.jar
+
+  # jackson-mapper-asl-1.9.13.jar
+  1ee2f2bed0e5dd29d1cb155a166e6f8d50bbddb7:
+    groupId: org.codehaus.jackson
+    artifactId: jackson-mapper-asl
+    version: "1.9.13"
+    jarName: jackson-mapper-asl-1.9.13.jar
+
+  # bcprov-jdk15on-166.jar
+  ed564ade61defca27e26fb1378a70b22831fc5c1:
+    groupId: org.bouncycastle
+    artifactId: bcprov-jdk15on
+    version: "1.66"
+    jarName: bcprov-jdk15on-166.jar
+
+  # jackson-databind-2.9.4.jar
+  498bbc3b94f566982c7f7c6d4d303fce365529be:
+    groupId: com.fasterxml.jackson.core
+    artifactId: jackson-databind
+    version: "2.9.4"
+    jarName: jackson-databind-2.9.4.jar
+
+  # commons-beanutils-1.9.1.jar
+  d2662a4e018671ed061e9acca6299a31b7652f3c:
+    groupId: commons-beanutils
+    artifactId: commons-beanutils
+    version: "1.9.1"
+    jarName: commons-beanutils-1.9.1.jar
+
+  # commons-lang3-3.8.1.jar
+  6505a72a097d9270f7a9e7bf42c4238283247755:
+    groupId: org.apache.commons
+    artifactId: commons-lang3
+    version: "3.8.1"
+    jarName: commons-lang3-3.8.1.jar
+
+  # jackson-core-2.9.4.jar
+  a9a71ec1aa37da47db168fede9a4a5fb5e374320:
+    groupId: com.fasterxml.jackson.core
+    artifactId: jackson-core
+    version: "2.9.4"
+    jarName: jackson-core-2.9.4.jar
+
+  # stax-ex-1.7.8.jar
+  377077e4441cc46be5efde9de63efdf790a59cd7:
+    groupId: org.jvnet.staxex
+    artifactId: stax-ex
+    version: "1.7.8"
+    jarName: stax-ex-1.7.8.jar
+
+  # dbunit-2.5.0.jar
+  fd9e26e8c2c54770840daf448ce684938becc732:
+    groupId: org.dbunit
+    artifactId: dbunit
+    version: "2.5.0"
+    jarName: dbunit-2.5.0.jar
+
+  # junit-4.11.jar
+  4e031bb61df09069aeb2bffb4019e7a5034a4ee0:
+    groupId: junit
+    artifactId: junit
+    version: "4.11"
+    jarName: junit-4.11.jar
+
+  # stax-api-1.0-2.jar
+  d6337b0de8b25e53e81b922352fbea9f9f57ba0b:
+    groupId: javax.xml.stream
+    artifactId: stax-api
+    version: "1.0-2"
+    jarName: stax-api-1.0-2.jar
+
+  # mina-core-2.0.4.jar
+  7fdb2aabfa2c942c2853158864abdebf27dc1003:
+    groupId: org.apache.mina
+    artifactId: mina-core
+    version: "2.0.4"
+    jarName: mina-core-2.0.4.jar
+
+  # commons-pool-1.3.jar
+  03231230c1d7631b66a74d1c4653cfd65a6f9ea0:
+    groupId: commons-pool
+    artifactId: commons-pool
+    version: "1.3"
+    jarName: commons-pool-1.3.jar
+
+  # mockito-all-1.9.0.jar
+  d13863fbd7c0bc32845c9d8a261d03b61bf28194:
+    groupId: org.mockito
+    artifactId: mockito-all
+    version: "1.9.0"
+    jarName: mockito-all-1.9.0.jar
+
+  # jetty-util-6.1.26.jar
+  e5642fe0399814e1687d55a3862aa5a3417226a9:
+    groupId: org.mortbay.jetty
+    artifactId: jetty-util
+    version: "6.1.26"
+    jarName: jetty-util-6.1.26.jar
+
+  # assertj-core-1.5.0.jar
+  d486ec2f10fb7e8ff3b01c34d4fe5732851b1b7d:
+    groupId: org.assertj
+    artifactId: assertj-core
+    version: "1.5.0"
+    jarName: assertj-core-1.5.0.jar
+
+  # resolver-20050927.jar
+  ee4db4a5f15cbdb453808c2839f08240ac231e46:
+    groupId: com.sun.org.apache.xml.internal
+    artifactId: resolver
+    version: "20050927"
+    jarName: resolver-20050927.jar
+
+  # ftpserver-core-1.0.6.jar
+  2ad1570cd6c0d7ea7ca4d3c26a205e02452f5d7d:
+    groupId: org.apache.ftpserver
+    artifactId: ftpserver-core
+    version: "1.0.6"
+    jarName: ftpserver-core-1.0.6.jar
+
+  # commons-dbcp-1.4.jar
+  30be73c965cc990b153a100aaaaafcf239f82d39:
+    groupId: commons-dbcp
+    artifactId: commons-dbcp
+    version: "1.4"
+    jarName: commons-dbcp-1.4.jar
+
+  # h2-1.3.173.jar
+  3d9cc700d2c6b0b7a9bb59bd2b850e6518b6c209:
+    groupId: com.h2database
+    artifactId: h2
+    version: "1.3.173"
+    jarName: h2-1.3.173.jar
+
+  # commons-io-2.4.jar
+  b1b6ea3b7e4aa4f492509a4952029cd8e48019ad:
+    groupId: commons-io
+    artifactId: commons-io
+    version: "2.4"
+    jarName: commons-io-2.4.jar
+
+  # jetty-6.1.26.jar
+  2f546e289fddd5b1fab1d4199fbb6e9ef43ee4b0:
+    groupId: org.mortbay.jetty
+    artifactId: jetty
+    version: "6.1.26"
+    jarName: jetty-6.1.26.jar
+
+  # springockito-annotations-1.0.9.jar
+  8c8c4acdeb734a78d524424f5099a05c0147ba09:
+    groupId: org.kubek2k
+    artifactId: springockito-annotations
+    version: "1.0.9"
+    jarName: springockito-annotations-1.0.9.jar
+
+  # hamcrest-core-1.3.jar
+  42a25dc3219429f0e5d060061f71acb49bf010a0:
+    groupId: org.hamcrest
+    artifactId: hamcrest-core
+    version: "1.3"
+    jarName: hamcrest-core-1.3.jar
+
+  # saaj-impl-1.4.0.jar
+  6bfb1664ab42506a6547a3972395ea3f5b59ef6c:
+    groupId: com.sun.xml.messaging.saaj
+    artifactId: saaj-impl
+    version: "1.4.0"
+    jarName: saaj-impl-1.4.0.jar
+
+  # ftplet-api-1.0.6.jar
+  26e5401d312ddce82027a200941a48272700443a:
+    groupId: org.apache.ftpserver
+    artifactId: ftplet-api
+    version: "1.0.6"
+    jarName: ftplet-api-1.0.6.jar
+
+  # streambuffer-1.5.4.jar
+  fa88707c78bb5f1e5dff5149622625acaa9c6682:
+    groupId: com.sun.xml.stream.buffer
+    artifactId: streambuffer
+    version: "1.5.4"
+    jarName: streambuffer-1.5.4.jar
+
+  # spring-test-dbunit-1.2.1.jar
+  c566b9a055475347b3eafe8c772e1c47bb648860:
+    groupId: com.github.springtestdbunit
+    artifactId: spring-test-dbunit
+    version: "1.2.1"
+    jarName: spring-test-dbunit-1.2.1.jar
+
+  # servlet-api-2.5-20081211.jar
+  22bff70037e1e6fa7e6413149489552ee2064702:
+    groupId: org.mortbay.jetty
+    artifactId: servlet-api
+    version: "2.5-20081211"
+    jarName: servlet-api-2.5-20081211.jar
+
+  # servlet-api-2.5.jar
+  5959582d97d8b61f4d154ca9e495aafd16726e34:
+    groupId: org.zenframework.z8.dependencies.servlet
+    artifactId: servlet-api-2.5
+    version: "2.0"
+    jarName: servlet-api-2.5.jar
