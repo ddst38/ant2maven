@@ -10,6 +10,7 @@ import fr.cnam.migration.generator.TemplateService;
 import fr.cnam.migration.model.*;
 import fr.cnam.migration.autofix.model.AutoFixResult;
 import fr.cnam.migration.autofix.model.MissingDependency;
+import fr.cnam.migration.autofix.model.ProvidedDependency;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVPrinter;
 import org.slf4j.Logger;
@@ -740,6 +741,26 @@ public class ReportGenerator {
                 html.append("<tr><td><code>").append(displayName).append("</code></td>");
                 html.append("<td><code>").append(groupId).append(":").append(artifactName).append(":").append(version).append("</code></td>");
                 html.append("<td>").append(formatSize(jar.size())).append("</td></tr>");
+            }
+
+            html.append("</table>");
+        }
+
+        // =====================================================================
+        // SECTION : Bibliothèques provided (ajoutées par auto-fix)
+        // =====================================================================
+        if (autoFixResult != null && !autoFixResult.addedDependencies().isEmpty()) {
+            html.append("<h2 class='success'>✅ Bibliothèques provided (").append(autoFixResult.addedDependencies().size()).append(")</h2>");
+            html.append("<p><em>Ces bibliothèques ont été ajoutées automatiquement par le mode <code>--auto-fix</code> ");
+            html.append("depuis le répertoire <code>lib-provided/</code>.</em></p>");
+            html.append("<table><tr><th>Coordonnées Maven</th><th>Fichier JAR</th><th>Scope</th></tr>");
+
+            for (ProvidedDependency dep : autoFixResult.addedDependencies()) {
+                html.append("<tr>");
+                html.append("<td><code>").append(dep.toGav()).append("</code></td>");
+                html.append("<td><code>").append(dep.jarPath().getFileName()).append("</code></td>");
+                html.append("<td>provided</td>");
+                html.append("</tr>");
             }
 
             html.append("</table>");
