@@ -63,8 +63,9 @@ public class JarNameCleaner {
             log.debug("Suppression du préfixe DEPFAB. de {}", jarName);
 
             // Étape 2 : Vérifier s'il y a un code projet à supprimer
+            // Ne pas matcher si groupe(2) == "jar" (sinon DEPFAB.TRGU_H.jar → "jar")
             Matcher matcher = PROJECT_CODE_PATTERN.matcher(afterDepfab);
-            if (matcher.matches()) {
+            if (matcher.matches() && !matcher.group(2).equals("jar")) {
                 String projectCode = matcher.group(1);
                 cleanedName = matcher.group(2);
                 log.debug("Suppression du code projet {} -> {}", projectCode, cleanedName);

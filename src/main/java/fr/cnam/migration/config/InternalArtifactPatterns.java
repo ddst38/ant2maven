@@ -118,13 +118,23 @@ public class InternalArtifactPatterns {
 
         // Pattern DEPFAB générique : DEPFAB.anything.jar -> SHA-{sha1}
         // Utilise le SHA1 du JAR comme version pour garantir l'unicité
+        // Analyse le contenu du JAR pour inférer le groupId à partir des packages Java
         patterns.add(new InternalPattern(
             Pattern.compile("^DEPFAB\\.(.+)\\.jar$"),
-            (m, jar) -> new MavenCoordinate(
-                basePackage + ".internal",
-                m.group(1).replaceAll("[^a-zA-Z0-9-]", "-").toLowerCase(),
-                jar.sha1() != null ? "SHA-" + jar.sha1() : "UNKNOWN"
-            )
+            (m, jar) -> {
+                String artifactId = m.group(1).replaceAll("[^a-zA-Z0-9-]", "-").toLowerCase();
+                String version = jar.sha1() != null ? "SHA-" + jar.sha1() : "UNKNOWN";
+
+                // Analyser le contenu du JAR pour inférer le groupId
+                if (jar.path() != null) {
+                    JarPackageAnalyzer.PackageAnalysis analysis = packageAnalyzer.analyze(jar.path());
+                    if (analysis.inferredGroupId() != null) {
+                        return new MavenCoordinate(analysis.inferredGroupId(), artifactId, version);
+                    }
+                }
+                // Fallback si analyse échoue
+                return new MavenCoordinate(basePackage + ".internal", artifactId, version);
+            }
         ));
 
         // jk-socle-XXX-version.jar -> {basePackage}.jk.socle:jk-socle-xxx:version
