@@ -68,11 +68,44 @@ java -jar target/ant2maven-1.0-SNAPSHOT.jar \
 
 | Option | Description |
 |--------|-------------|
-| `--project-path` | Chemin projet ANT source |
-| `--output-dir` | Répertoire sortie Maven |
-| `--build-profile` | Profil (default/pic) |
+| `-p, --project` | Chemin projet ANT source |
+| `-o, --output` | Répertoire sortie Maven |
+| `--profile` | Profil (default/pic) |
 | `--artifactory-url` | URL Artifactory (optionnel) |
-| `--deployment-mode` | LOCAL ou REMOTE |
+| `--deploy-mode` | LOCAL ou REMOTE |
+| `--auto-fix` | Compile et ajoute automatiquement les dépendances provided manquantes |
+| `--lib-provided` | Répertoire des librairies provided (défaut: lib-provided) |
+
+## Mode Auto-Fix
+
+**Classe:** `autofix/AutoFixService.java`
+
+Le mode `--auto-fix` effectue une correction automatique après la migration :
+
+### Fonctionnement
+1. **Indexation lib-provided** : Scanne le répertoire `lib-provided/` et indexe toutes les classes Java par JAR
+2. **Compilation initiale** : Compile le projet Maven généré
+3. **Analyse des erreurs** : Parse les erreurs de compilation pour identifier les packages/classes manquants
+4. **Résolution automatique** : Trouve les JARs dans `lib-provided/` qui contiennent les classes manquantes
+5. **Ajout des dépendances** : Ajoute les JARs trouvés comme dépendances `provided` dans le POM
+6. **Itérations** : Répète jusqu'à compilation réussie ou max 5 itérations
+
+### Classes clés
+| Classe | Rôle |
+|--------|------|
+| `AutoFixService.java` | Orchestration du cycle compile/fix |
+| `LibProvidedIndexer.java` | Indexation classes → JAR |
+| `CompilationErrorParser.java` | Parse erreurs javac |
+| `ProvidedDependencyResolver.java` | Résout packages → JARs |
+
+### Répertoire lib-provided
+Contient les JARs serveur (WebLogic, J2EE, etc.) qui seront ajoutés en scope `provided` :
+```
+lib-provided/
+├── weblogic.jar
+├── javax.servlet-api.jar
+└── ...
+```
 
 ## Rapports générés
 

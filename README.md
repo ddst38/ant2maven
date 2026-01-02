@@ -11,6 +11,7 @@ Outil de migration automatique pour transformer des projets Java Ant/CVS en proj
   - [Commandes de base](#commandes-de-base)
   - [Options complètes](#options-complètes)
   - [Exemples](#exemples)
+- [Mode Auto-Fix](#mode-auto-fix)
 - [Configuration](#configuration)
   - [Fichier known-artifacts.yaml](#fichier-known-artifactsyaml)
   - [Configuration Artifactory](#configuration-artifactory)
@@ -33,6 +34,8 @@ Outil de migration automatique pour transformer des projets Java Ant/CVS en proj
 - **Gestion des JARs internes** avec versionnement SHA pour éviter les collisions
 - **Intégration Artifactory** avec support SSL personnalisé
 - **Modes de déploiement** : LOCAL (repository .m2) ou REMOTE (upload Artifactory)
+- **Mode Auto-Fix** : correction automatique des erreurs de compilation via `--auto-fix`
+- **Inference groupId** : analyse du contenu des JARs pour inférer le groupId depuis les packages Java
 - **Rapports HTML** détaillés sur la migration
 - **Scripts d'installation** pour les JARs internes
 - **Configuration flexible** via fichier YAML ou ligne de commande
@@ -103,6 +106,8 @@ java -jar ant2maven-1.0.0-SNAPSHOT.jar \
 | `--base-package` | Package de base pour les artefacts internes | `fr.cnamts` |
 | `--dry-run` | Mode analyse sans génération de fichiers | `false` |
 | `--skip-maven-central` | Désactiver la recherche sur Maven Central | `false` |
+| `--auto-fix` | Compile et ajoute automatiquement les dépendances provided | `false` |
+| `--lib-provided` | Répertoire des librairies provided | `lib-provided` |
 | `-v, --verbose` | Activer les logs détaillés | `false` |
 
 #### Options Artifactory
@@ -168,6 +173,107 @@ java -jar ant2maven-1.0.0-SNAPSHOT.jar \
   -p /projects/GMIC_J \
   -k /config/my-known-artifacts.yaml \
   -v
+```
+
+#### Exemple 6 : Migration avec auto-fix (correction automatique)
+
+```bash
+java -jar ant2maven-1.0.0-SNAPSHOT.jar \
+  -p /projects/FANO_J \
+  -o /projects/FANO_J-maven \
+  --auto-fix \
+  -v
+```
+
+#### Exemple 7 : Auto-fix avec répertoire lib-provided personnalisé
+
+```bash
+java -jar ant2maven-1.0.0-SNAPSHOT.jar \
+  -p /projects/GMIC_J \
+  --auto-fix \
+  --lib-provided /chemin/vers/weblogic-libs \
+  -v
+```
+
+---
+
+## Mode Auto-Fix
+
+Le mode `--auto-fix` permet de résoudre automatiquement les erreurs de compilation dues aux dépendances serveur manquantes (WebLogic, J2EE, etc.).
+
+### Principe
+
+1. **Migration standard** : Le projet est d'abord migré normalement
+2. **Compilation** : Le projet Maven généré est compilé
+3. **Analyse des erreurs** : Les erreurs de compilation sont analysées pour identifier les classes/packages manquants
+4. **Résolution** : Les JARs contenant ces classes sont recherchés dans `lib-provided/`
+5. **Correction** : Les JARs trouvés sont ajoutés comme dépendances `provided` dans le POM
+6. **Itération** : Le cycle compile/fix se répète jusqu'à succès (max 5 itérations)
+
+### Répertoire lib-provided
+
+Le répertoire `lib-provided/` (configurable via `--lib-provided`) doit contenir les JARs serveur :
+
+```
+lib-provided/
+├── weblogic.jar              # Classes WebLogic
+├── javax.servlet-api-3.1.0.jar
+├── javax.ejb-api-3.2.jar
+└── ...
+```
+
+Ces JARs sont indexés au démarrage : toutes les classes Java sont mappées vers leur JAR source.
+
+### Fonctionnement détaillé
+
+```
+Migration terminée
+       ↓
+[Indexation lib-provided]
+  31096 classes, 3 JARs indexés
+       ↓
+[Compilation Maven]
+       ↓
+  Erreurs ?
+    ├─ Non → Succès !
+    └─ Oui → Analyse des erreurs
+              ↓
+         [Résolution packages manquants]
+           javax.servlet.* → javax.servlet-api.jar
+           weblogic.* → weblogic.jar
+              ↓
+         [Ajout dépendances provided au POM]
+              ↓
+         [Recompilation] → Retour à "Erreurs ?"
+```
+
+### Rapport auto-fix
+
+Le rapport `migration-report.html` inclut une section dédiée listant :
+- Les dépendances provided ajoutées automatiquement
+- Les packages qui n'ont pas pu être résolus (si échec)
+
+### Exemple de sortie
+
+```
+============================================================
+Correction automatique - Auto-fix
+============================================================
+Projet : ../FANO_J-maven
+Lib-provided : lib-provided
+Iterations max : 5
+
+Phase 1: Indexation de lib-provided...
+Indexation terminee : 31096 classes, 1442 packages, 3 JARs
+
+Installation des JARs locaux...
+[...]
+
+Iteration 1/5:
+Compilation du projet...
+BUILD SUCCESS
+
+Auto-fix terminé avec succès !
 ```
 
 ---
@@ -577,6 +683,14 @@ Ce projet est sous licence interne CNAM.
 ---
 
 ## Changelog
+
+### Version 1.3.0
+- **Mode Auto-Fix** : Option `--auto-fix` pour corriger automatiquement les erreurs de compilation
+- **Lib-provided** : Support du répertoire `lib-provided/` pour les dépendances serveur
+- **Indexation des classes** : Mapping automatique classes Java → JARs pour résolution rapide
+- **Inference groupId** : Le pattern DEPFAB générique analyse le contenu du JAR pour inférer le groupId depuis les packages Java réels (ex: `fr.cnamts.trgu` au lieu de `fr.cnamts.internal`)
+- **Correction JarNameCleaner** : Fix du bug où `DEPFAB.XXX_Y.jar` était renommé en `jar` au lieu de `XXX_Y.jar`
+- **Rapport amélioré** : Section bibliothèques provided dans le rapport HTML
 
 ### Version 1.2.0
 - **Cache automatique SHA1** : Les résolutions sont sauvegardées dans known-artifacts.yaml
