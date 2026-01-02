@@ -7,6 +7,7 @@ Outil de migration automatique pour transformer des projets Java Ant/CVS en proj
 - [Fonctionnalités](#fonctionnalités)
 - [Prérequis](#prérequis)
 - [Installation](#installation)
+- [Référence rapide](#référence-rapide)
 - [Utilisation](#utilisation)
   - [Commandes de base](#commandes-de-base)
   - [Options complètes](#options-complètes)
@@ -68,6 +69,43 @@ Le JAR exécutable sera généré dans `target/ant2maven-1.0.0-SNAPSHOT.jar`.
 mvn exec:java -Dexec.mainClass="fr.cnam.migration.Ant2MavenApplication" \
   -Dexec.args="<options>"
 ```
+
+---
+
+## Référence rapide
+
+```bash
+# Synopsis
+java -jar ant2maven-1.0.0-SNAPSHOT.jar [OPTIONS] -p <projet-source>
+
+# Migration basique
+java -jar ant2maven-1.0.0-SNAPSHOT.jar -p ./MonProjet
+
+# Migration avec sortie personnalisée
+java -jar ant2maven-1.0.0-SNAPSHOT.jar -p ./MonProjet -o ./MonProjet-maven
+
+# Migration avec correction automatique (recommandé)
+java -jar ant2maven-1.0.0-SNAPSHOT.jar -p ./MonProjet --auto-fix -v
+
+# Analyse seule (sans génération)
+java -jar ant2maven-1.0.0-SNAPSHOT.jar -p ./MonProjet --dry-run
+
+# Avec Artifactory
+java -jar ant2maven-1.0.0-SNAPSHOT.jar -p ./MonProjet \
+  --artifactory-url https://artifactory.example.com/artifactory \
+  --artifactory-cert ./cert.crt
+```
+
+| Option courte | Option longue | Description |
+|---------------|---------------|-------------|
+| `-p` | `--project` | **Requis.** Chemin du projet Ant source |
+| `-o` | `--output` | Répertoire de sortie (défaut: `<projet>-maven`) |
+| `-v` | `--verbose` | Mode verbeux |
+| | `--auto-fix` | Corrige automatiquement les erreurs de compilation |
+| | `--lib-provided` | Répertoire des JARs serveur (défaut: `lib-provided`) |
+| | `--dry-run` | Analyse sans générer de fichiers |
+| `-k` | `--known-artifacts` | Fichier YAML de cache des artefacts |
+| | `--base-package` | Package de base (défaut: `fr.cnamts`) |
 
 ---
 
