@@ -8,6 +8,8 @@ import fr.cnam.migration.config.JarNameCleaner;
 import fr.cnam.migration.config.MigrationConfig;
 import fr.cnam.migration.generator.TemplateService;
 import fr.cnam.migration.model.*;
+import fr.cnam.migration.autofix.model.AutoFixResult;
+import fr.cnam.migration.autofix.model.MissingDependency;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVPrinter;
 import org.slf4j.Logger;
@@ -385,10 +387,19 @@ public class ReportGenerator {
     }
 
     /**
-     * Génère un rapport de migration HTML entièrement en français.
+     * Génère un rapport de migration HTML (sans résultat auto-fix).
      */
     public void generateMigrationReport(ProjectStructure project, AnalysisResult analysis,
                                         Path outputDir) throws IOException {
+        generateMigrationReport(project, analysis, outputDir, null);
+    }
+
+    /**
+     * Génère un rapport de migration HTML entièrement en français.
+     * @param autoFixResult Résultat de l'auto-fix (peut être null si --auto-fix non utilisé)
+     */
+    public void generateMigrationReport(ProjectStructure project, AnalysisResult analysis,
+                                        Path outputDir, AutoFixResult autoFixResult) throws IOException {
         Files.createDirectories(outputDir);
         Path reportFile = outputDir.resolve("migration-report.html");
 
@@ -418,6 +429,9 @@ public class ReportGenerator {
                     .config-table { width: auto; }
                     .config-table td { padding: 4px 12px; }
                     .source-ear { font-style: italic; color: #666; font-size: 0.9em; }
+                    .loaded { background-color: #d4edda; }
+                    .not-loaded { background-color: #f8d7da; }
+                    .conflict-warning { color: #856404; background-color: #fff3cd; padding: 10px; border-radius: 5px; margin: 10px 0; }
                 </style>
             </head>
             <body>
@@ -530,6 +544,70 @@ public class ReportGenerator {
             }
         }
         html.append("</table>");
+
+        // =====================================================================
+        // SECTION : Conflits de versions
+        // =====================================================================
+        // Grouper par groupId:artifactId (sans version) pour détecter les doublons
+        Map<String, List<DependencyInfo>> byGaWithoutVersion = analysis.resolved().stream()
+            .collect(Collectors.groupingBy(
+                d -> d.groupId() + ":" + d.artifactId(),
+                LinkedHashMap::new,
+                Collectors.toList()
+            ));
+
+        // Filtrer ceux qui ont plusieurs versions différentes
+        Map<String, List<DependencyInfo>> conflicts = byGaWithoutVersion.entrySet().stream()
+            .filter(e -> e.getValue().stream()
+                .map(DependencyInfo::version)
+                .distinct()
+                .count() > 1)
+            .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue, (a,b)->a, LinkedHashMap::new));
+
+        if (!conflicts.isEmpty()) {
+            html.append("<h2 class='warning'>⚠️ Conflits de versions (").append(conflicts.size()).append(")</h2>");
+            html.append("<p class='conflict-warning'>Ces bibliothèques sont déclarées plusieurs fois avec des versions différentes. ");
+            html.append("Dans Maven, la <strong>dernière version déclarée</strong> dans le POM est celle qui est chargée dans le classpath.</p>");
+            html.append("<table><tr><th>Bibliothèque</th><th>Versions</th><th>Statut classpath</th></tr>");
+
+            for (Map.Entry<String, List<DependencyInfo>> entry : conflicts.entrySet()) {
+                String ga = entry.getKey();
+                List<DependencyInfo> deps = entry.getValue();
+
+                // Trouver l'index max dans la liste resolved() pour déterminer la version chargée
+                List<DependencyInfo> resolvedList = analysis.resolved();
+                int maxIndex = -1;
+                DependencyInfo loadedDep = null;
+                for (DependencyInfo dep : deps) {
+                    int idx = resolvedList.indexOf(dep);
+                    if (idx > maxIndex) {
+                        maxIndex = idx;
+                        loadedDep = dep;
+                    }
+                }
+
+                html.append("<tr><td><code>").append(ga).append("</code></td>");
+                html.append("<td>");
+
+                // Collecter les versions uniques avec leur statut
+                Set<String> seenVersions = new LinkedHashSet<>();
+                for (DependencyInfo dep : deps) {
+                    String version = dep.version();
+                    if (!seenVersions.contains(version)) {
+                        seenVersions.add(version);
+                        boolean isLoaded = loadedDep != null && version.equals(loadedDep.version());
+                        String cssClass = isLoaded ? "loaded" : "not-loaded";
+                        String marker = isLoaded ? " ✓" : "";
+                        html.append("<span class='").append(cssClass).append("'>").append(version).append(marker).append("</span><br>");
+                    }
+                }
+
+                html.append("</td>");
+                html.append("<td>Version <code>").append(loadedDep != null ? loadedDep.version() : "?").append("</code> chargée (dernière déclarée)</td>");
+                html.append("</tr>");
+            }
+            html.append("</table>");
+        }
 
         // =====================================================================
         // SECTION : Bibliothèques résolues (Maven Central ou Artifactory uniquement)
@@ -665,6 +743,28 @@ public class ReportGenerator {
             }
 
             html.append("</table>");
+        }
+
+        // =====================================================================
+        // SECTION : Packages manquants (uniquement si auto-fix activé et échec)
+        // =====================================================================
+        if (autoFixResult != null && !autoFixResult.isSuccess() && !autoFixResult.unresolvedErrors().isEmpty()) {
+            html.append("<h2 class='error'>❌ Packages manquants (").append(autoFixResult.unresolvedErrors().size()).append(")</h2>");
+            html.append("<p><em>Ces packages/classes n'ont pas pu être résolus malgré le mode <code>--auto-fix</code>. ");
+            html.append("Le projet ne compile pas.</em></p>");
+            html.append("<table><tr><th>Type</th><th>Nom complet</th><th>Package</th><th>Fichier source</th></tr>");
+
+            for (MissingDependency missing : autoFixResult.unresolvedErrors()) {
+                html.append("<tr>");
+                html.append("<td>").append(missing.type()).append("</td>");
+                html.append("<td><code>").append(missing.name()).append("</code></td>");
+                html.append("<td><code>").append(missing.getPackage()).append("</code></td>");
+                html.append("<td>").append(missing.sourceFile() != null ? missing.sourceFile() : "-").append("</td>");
+                html.append("</tr>");
+            }
+
+            html.append("</table>");
+            html.append("<p class='info'><strong>Actions suggérées :</strong> Ajouter les JARs manquants dans <code>lib-provided/</code> puis relancer avec <code>--auto-fix</code></p>");
         }
 
         // Informations du projet

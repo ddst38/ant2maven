@@ -302,6 +302,10 @@ public class Ant2MavenApplication implements Callable<Integer> {
                     AutoFixResult fixResult = autoFixService.fix(result.outputDir(), effectiveLibProvided);
                     autoFixService.printSummary(fixResult);
 
+                    // Régénérer le rapport HTML avec le résultat auto-fix
+                    log.info("Mise à jour du rapport HTML avec les résultats auto-fix...");
+                    reportGenerator.generateMigrationReport(project, analysis, config.outputDir(), fixResult);
+
                     if (!fixResult.isSuccess()) {
                         log.warn("Correction automatique incomplete. Verifiez les erreurs restantes.");
                     }
