@@ -34,3 +34,4 @@ logs/
 # Test output
 test-output/
 surefire-reports/
+lib-provided/

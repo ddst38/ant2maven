@@ -148,10 +148,11 @@ public class JarScanner {
      *
      * Priorité de catégorisation :
      * 1. APP-INF/lib ou WEB-INF/lib → MAIN (dépendances runtime d'entreprise)
-     * 2. src/test/ ou lib/test/ → TEST (tests unitaires/intégration)
-     * 3. provided/ → PROVIDED
-     * 4. runtime/ → RUNTIME
-     * 5. Défaut → MAIN
+     * 2. Module test (nom contenant "test") → TEST
+     * 3. src/test/ ou lib/test/ → TEST (tests unitaires/intégration)
+     * 4. provided/ → PROVIDED
+     * 5. runtime/ → RUNTIME
+     * 6. Défaut → MAIN
      */
     public JarInfo.JarCategory categorizeByPath(Path jarPath, Path projectRoot) {
         String pathStr = projectRoot.relativize(jarPath).toString().toLowerCase();
@@ -163,7 +164,13 @@ public class JarScanner {
             return JarInfo.JarCategory.MAIN;
         }
 
-        // Priorité 2 : Les répertoires de test explicites
+        // Priorité 2 : Module de test (nom du répertoire parent contient "test")
+        // Ex: MetierFANOtest/lib/junit-4.8.2.jar → TEST
+        if (isInTestModule(pathStr)) {
+            return JarInfo.JarCategory.TEST;
+        }
+
+        // Priorité 3 : Les répertoires de test explicites
         // src/test/ = code de test Maven/Gradle
         // lib/test/ = bibliothèques de test
         if (pathStr.contains("src/test/") || pathStr.contains("src\\test\\") ||
@@ -181,6 +188,29 @@ public class JarScanner {
         }
 
         return JarInfo.JarCategory.MAIN;
+    }
+
+    /**
+     * Vérifie si le JAR est dans un module de test.
+     * Détecte les patterns: *test/lib/, *Test/lib/, *tests/lib/
+     */
+    private boolean isInTestModule(String pathStr) {
+        // Patterns pour détecter un module de test
+        // Le chemin doit avoir un segment contenant "test" suivi de /lib/
+        String normalized = pathStr.replace("\\", "/");
+        String[] segments = normalized.split("/");
+
+        for (int i = 0; i < segments.length - 1; i++) {
+            String segment = segments[i].toLowerCase();
+            // Le segment contient "test" (ex: MetierFANOtest, fano-test, tests)
+            // et le segment suivant est "lib"
+            if (segment.contains("test") && i + 1 < segments.length) {
+                if (segments[i + 1].equals("lib")) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     /**

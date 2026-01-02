@@ -69,6 +69,45 @@
         </pluginManagement>
     </build>
 
+<#if dependencies?? && dependencies?size gt 0>
+    <dependencies>
+<#list dependencies as dep>
+<#if dep.comment??>
+        <!-- ${dep.comment} -->
+</#if>
+        <dependency>
+            <groupId>${dep.groupId}</groupId>
+            <artifactId>${dep.artifactId}</artifactId>
+<#if dep.version??>
+            <version>${dep.version}</version>
+</#if>
+<#if dep.scope??>
+            <scope>${dep.scope}</scope>
+</#if>
+<#if dep.classifier??>
+            <classifier>${dep.classifier}</classifier>
+</#if>
+<#if dep.groupId == "log4j" && dep.artifactId == "log4j" && dep.version?? && dep.version?starts_with("1.2")>
+            <exclusions>
+                <exclusion>
+                    <groupId>javax.jms</groupId>
+                    <artifactId>jms</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>com.sun.jdmk</groupId>
+                    <artifactId>jmxtools</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>com.sun.jmx</groupId>
+                    <artifactId>jmxri</artifactId>
+                </exclusion>
+            </exclusions>
+</#if>
+        </dependency>
+</#list>
+    </dependencies>
+</#if>
+
 <#if hasPicProfile>
     <profiles>
         <profile>

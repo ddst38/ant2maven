@@ -15,7 +15,13 @@ public enum ProjectType {
      * Structure style Eclipse : XXX/src, XXX/WebContent
      * Modules typiques : XXX, XXXEar
      */
-    ECLIPSE_STYLE;
+    ECLIPSE_STYLE,
+
+    /**
+     * Structure multi-module : plusieurs sous-projets avec chaine de dependances.
+     * Ex: MetierXXXClient -> MetierXXX -> MetierXXXjms -> MetierXXXws
+     */
+    MULTI_MODULE;
 
     /**
      * Retourne une description de ce type de projet.
@@ -24,6 +30,7 @@ public enum ProjectType {
         return switch (this) {
             case MAVEN_STYLE -> "Structure style Maven (src/main/java)";
             case ECLIPSE_STYLE -> "Structure style Eclipse (src, WebContent)";
+            case MULTI_MODULE -> "Structure multi-module (plusieurs JAR/WAR avec dependances)";
         };
     }
 }

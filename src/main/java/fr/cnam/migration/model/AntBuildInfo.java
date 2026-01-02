@@ -23,6 +23,15 @@ public record AntBuildInfo(
     String earConfDir,
     boolean isPicBuild  // true si c'est un build.pic.xml
 ) {
+    /**
+     * Récupère la valeur d'une property Ant par son nom.
+     * @param name Nom de la property
+     * @return Valeur de la property ou null si non définie
+     */
+    public String getProperty(String name) {
+        return properties != null ? properties.get(name) : null;
+    }
+
     public static Builder builder() {
         return new Builder();
     }

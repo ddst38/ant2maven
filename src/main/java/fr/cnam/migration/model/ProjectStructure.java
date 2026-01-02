@@ -17,8 +17,40 @@ public record ProjectStructure(
     List<AntBuildInfo> builds,
     List<InternalDependency> internalDeps,
     SourceLayout sourceLayout,
-    EarConfiguration earConfig
+    EarConfiguration earConfig,
+    DistributionConfig distributionConfig,
+    List<ModuleInfo> modules
 ) {
+
+    /**
+     * Verifie si le projet est multi-module.
+     */
+    public boolean isMultiModule() {
+        return type == ProjectType.MULTI_MODULE && modules != null && !modules.isEmpty();
+    }
+
+    /**
+     * Retourne les modules dans l'ordre de build.
+     */
+    public List<ModuleInfo> getModulesInBuildOrder() {
+        if (modules == null) return List.of();
+        return modules.stream()
+            .sorted(java.util.Comparator.comparingInt(ModuleInfo::buildOrder))
+            .toList();
+    }
+    /**
+     * Configuration pour le packaging de distribution (module dist).
+     * Contient les chemins vers install/conf, install/script et les exclusions.
+     */
+    public record DistributionConfig(
+        Path installConfPath,
+        Path installScriptPath,
+        List<String> confExclusions
+    ) {
+        public boolean hasDistribution() {
+            return installConfPath != null || installScriptPath != null;
+        }
+    }
     /**
      * Retourne tous les JARs de toutes les catégories.
      */
@@ -134,6 +166,8 @@ public record ProjectStructure(
         private List<InternalDependency> internalDeps = List.of();
         private SourceLayout sourceLayout;
         private EarConfiguration earConfig;
+        private DistributionConfig distributionConfig;
+        private List<ModuleInfo> modules = List.of();
 
         public Builder name(String name) {
             this.name = name;
@@ -185,10 +219,20 @@ public record ProjectStructure(
             return this;
         }
 
+        public Builder distributionConfig(DistributionConfig distributionConfig) {
+            this.distributionConfig = distributionConfig;
+            return this;
+        }
+
+        public Builder modules(List<ModuleInfo> modules) {
+            this.modules = modules != null ? modules : List.of();
+            return this;
+        }
+
         public ProjectStructure build() {
             return new ProjectStructure(
                 name, projectRoot, type, mainLibs, testLibs, providedLibs,
-                builds, internalDeps, sourceLayout, earConfig
+                builds, internalDeps, sourceLayout, earConfig, distributionConfig, modules
             );
         }
     }

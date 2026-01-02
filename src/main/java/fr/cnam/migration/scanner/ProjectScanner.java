@@ -136,6 +136,16 @@ public class ProjectScanner {
         // Extraire la configuration EAR
         EarConfiguration earConfig = extractEarConfig(projectRoot, type);
 
+        // Détecter la configuration de distribution (install/conf, install/script)
+        ProjectStructure.DistributionConfig distConfig = detectDistributionConfig(projectRoot, builds);
+
+        // Parser les modules pour les projets multi-module
+        List<ModuleInfo> modules = List.of();
+        if (type == ProjectType.MULTI_MODULE) {
+            modules = antParser.parseModules(projectRoot);
+            log.info("Parsed {} modules from build.xml", modules.size());
+        }
+
         return ProjectStructure.builder()
             .name(projectName)
             .projectRoot(projectRoot)
@@ -147,7 +157,49 @@ public class ProjectScanner {
             .internalDeps(internalDeps)
             .sourceLayout(sourceLayout)
             .earConfig(earConfig)
+            .distributionConfig(distConfig)
+            .modules(modules)
             .build();
+    }
+
+    /**
+     * Détecte la configuration de distribution pour le packaging.
+     * Recherche install/conf et install/script, et parse confExclu depuis build.xml.
+     */
+    private ProjectStructure.DistributionConfig detectDistributionConfig(Path projectRoot, List<AntBuildInfo> builds) {
+        Path installConf = projectRoot.resolve("install/conf");
+        Path installScript = projectRoot.resolve("install/script");
+
+        Path confPath = Files.isDirectory(installConf) ? installConf : null;
+        Path scriptPath = Files.isDirectory(installScript) ? installScript : null;
+
+        // Parser confExclu depuis le build principal
+        List<String> confExclusions = new ArrayList<>();
+        if (!builds.isEmpty()) {
+            AntBuildInfo primaryBuild = builds.stream()
+                .filter(b -> !b.isPicBuild())
+                .findFirst()
+                .orElse(builds.get(0));
+
+            // Récupérer confExclu depuis les properties du build
+            String confExclu = primaryBuild.getProperty("confExclu");
+            if (confExclu != null && !confExclu.isEmpty()) {
+                // Format: "file1.properties,file2.xml,..."
+                for (String exclusion : confExclu.split(",")) {
+                    String trimmed = exclusion.trim();
+                    if (!trimmed.isEmpty()) {
+                        confExclusions.add(trimmed);
+                    }
+                }
+            }
+        }
+
+        if (confPath != null || scriptPath != null) {
+            log.info("Distribution config detected: conf={}, script={}, exclusions={}",
+                confPath != null, scriptPath != null, confExclusions.size());
+        }
+
+        return new ProjectStructure.DistributionConfig(confPath, scriptPath, confExclusions);
     }
 
     /**
@@ -155,6 +207,12 @@ public class ProjectScanner {
      * Détection générique sans noms de projets codés en dur.
      */
     private ProjectType detectProjectType(Path projectRoot) {
+        // Verifier d'abord si c'est un projet multi-module
+        if (antParser.isMultiModuleProject(projectRoot)) {
+            log.info("Detected multi-module project structure");
+            return ProjectType.MULTI_MODULE;
+        }
+
         try (Stream<Path> dirs = Files.list(projectRoot)) {
             // Chercher style Maven : tout répertoire finissant par -app qui a src/main/java
             boolean hasMavenStyle = dirs

@@ -1,6 +1,8 @@
 package fr.cnam.migration;
 
 import fr.cnam.migration.analyzer.DependencyAnalyzer;
+import fr.cnam.migration.autofix.AutoFixService;
+import fr.cnam.migration.autofix.model.AutoFixResult;
 import fr.cnam.migration.config.MigrationConfig;
 import fr.cnam.migration.config.MigrationConfig.DeploymentMode;
 import fr.cnam.migration.generator.ProjectGenerator;
@@ -91,6 +93,20 @@ public class Ant2MavenApplication implements Callable<Integer> {
         defaultValue = "fr.cnamts"
     )
     private String basePackage;
+
+    // === Options Auto-fix ===
+
+    @Option(
+        names = {"--auto-fix"},
+        description = "Compile le projet et ajoute automatiquement les dependances provided manquantes"
+    )
+    private boolean autoFix;
+
+    @Option(
+        names = {"--lib-provided"},
+        description = "Repertoire des librairies provided (defaut: lib-provided dans ant2maven)"
+    )
+    private Path libProvidedDir;
 
     // === Options Artifactory ===
 
@@ -272,6 +288,28 @@ public class Ant2MavenApplication implements Callable<Integer> {
                 log.warn("See libnotfound.csv and migration-report.html for details.");
             }
 
+            // Phase 4 : Auto-fix (si active)
+            if (autoFix) {
+                log.info("");
+                Path effectiveLibProvided = libProvidedDir;
+                if (effectiveLibProvided == null) {
+                    // Chercher lib-provided dans le repertoire de l'executable
+                    effectiveLibProvided = findLibProvidedDir();
+                }
+
+                if (effectiveLibProvided != null) {
+                    AutoFixService autoFixService = new AutoFixService();
+                    AutoFixResult fixResult = autoFixService.fix(result.outputDir(), effectiveLibProvided);
+                    autoFixService.printSummary(fixResult);
+
+                    if (!fixResult.isSuccess()) {
+                        log.warn("Correction automatique incomplete. Verifiez les erreurs restantes.");
+                    }
+                } else {
+                    log.warn("Repertoire lib-provided non trouve. Utilisez --lib-provided pour specifier le chemin.");
+                }
+            }
+
             return 0;
 
         } catch (Exception e) {
@@ -281,6 +319,43 @@ public class Ant2MavenApplication implements Callable<Integer> {
             }
             return 1;
         }
+    }
+
+    /**
+     * Cherche le repertoire lib-provided dans les emplacements standards.
+     */
+    private Path findLibProvidedDir() {
+        // 1. Chercher dans le repertoire courant
+        Path current = Path.of("lib-provided");
+        if (java.nio.file.Files.isDirectory(current)) {
+            return current;
+        }
+
+        // 2. Chercher relativement au JAR
+        try {
+            Path jarPath = Path.of(getClass().getProtectionDomain().getCodeSource().getLocation().toURI());
+            Path jarDir = jarPath.getParent();
+            if (jarDir != null) {
+                // Si on est dans target/, remonter au parent
+                if (jarDir.getFileName().toString().equals("target")) {
+                    jarDir = jarDir.getParent();
+                }
+                Path libProvided = jarDir.resolve("lib-provided");
+                if (java.nio.file.Files.isDirectory(libProvided)) {
+                    return libProvided;
+                }
+            }
+        } catch (Exception e) {
+            log.debug("Impossible de determiner l'emplacement du JAR : {}", e.getMessage());
+        }
+
+        // 3. Chercher dans ant2maven/lib-provided
+        Path ant2maven = Path.of("ant2maven/lib-provided");
+        if (java.nio.file.Files.isDirectory(ant2maven)) {
+            return ant2maven;
+        }
+
+        return null;
     }
 
     public static void main(String[] args) {

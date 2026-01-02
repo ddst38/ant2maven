@@ -92,25 +92,27 @@ public class InternalArtifactPatterns {
             )
         ));
 
-        // DEPFAB.XXX_ServiceName_version_type.jar -> {basePackage}.internal:xxx-servicename:version-type
-        // Exemple : DEPFAB.W1_ServiceImageDecompte_v1.0_client.jar
+        // DEPFAB.XXX_ServiceName_version_type.jar -> {basePackage}.internal:xxx-servicename:SHA-{sha1}
+        // Exemple : DEPFAB.W1_ServiceImageDecompte_v1.0_client.jar, DEPFAB.EDAT_AttestationDroits_v1.0_client.jar
+        // Utilise le SHA1 pour garantir l'unicité et permettre l'installation locale
         patterns.add(new InternalPattern(
             Pattern.compile("^DEPFAB\\.([A-Z0-9]+)_([A-Za-z]+)_v?(\\d+\\.\\d+)_([a-z]+)\\.jar$"),
             (m, jar) -> new MavenCoordinate(
                 basePackage + ".internal",
                 m.group(1).toLowerCase() + "-" + m.group(2).toLowerCase(),
-                m.group(3) + "-" + m.group(4)
+                jar.sha1() != null ? "SHA-" + jar.sha1() : "UNKNOWN"
             )
         ));
 
-        // DEPFAB.XXX_WS.XXX_ServiceName.type.jar -> {basePackage}.internal:xxx-servicename:type
+        // DEPFAB.XXX_WS.XXX_ServiceName.type.jar -> {basePackage}.internal:xxx-servicename:SHA-{sha1}
         // Exemple : DEPFAB.GMIC_WS.GMIC_ServiceGMIC.serveur.jar
+        // Utilise le SHA1 pour garantir l'unicité et permettre l'installation locale
         patterns.add(new InternalPattern(
             Pattern.compile("^DEPFAB\\.([A-Z0-9]+)_WS\\.\\1_([A-Za-z]+)\\.([a-z]+)\\.jar$"),
             (m, jar) -> new MavenCoordinate(
                 basePackage + ".internal",
                 m.group(1).toLowerCase() + "-" + m.group(2).toLowerCase(),
-                m.group(3)
+                jar.sha1() != null ? "SHA-" + jar.sha1() : "UNKNOWN"
             )
         ));
 
@@ -156,14 +158,15 @@ public class InternalArtifactPatterns {
             )
         ));
 
-        // ServiceXXX_version.type.jar -> {basePackage}.services:servicexxx:version-type
+        // ServiceXXX_version.type.jar -> {basePackage}.services:servicexxx:SHA-{sha1}
         // Exemple : ServicePS_3.0.client.jar
+        // Utilise le SHA1 pour garantir l'unicité et permettre l'installation locale
         patterns.add(new InternalPattern(
             Pattern.compile("^(Service[A-Z]+)_(\\d+\\.\\d+)\\.([a-z]+)\\.jar$"),
             (m, jar) -> new MavenCoordinate(
                 basePackage + ".services",
                 m.group(1).toLowerCase(),
-                m.group(2) + "-" + m.group(3)
+                jar.sha1() != null ? "SHA-" + jar.sha1() : "UNKNOWN"
             )
         ));
 

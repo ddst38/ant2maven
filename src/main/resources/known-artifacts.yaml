@@ -174,3 +174,885 @@ knownArtifacts:
     artifactId: struts-extras
     version: "1.3.8"
     jarName: struts-extras.jar
+
+  # h2-1.3.163.jar
+  978de63cea2f9f71c20217ef2e2054d621a940e8:
+    groupId: com.h2database
+    artifactId: h2
+    version: "1.3.163"
+    jarName: h2-1.3.163.jar
+
+  # mockito-all-1.9.5.jar
+  79a8984096fc6591c1e3690e07d41be506356fa5:
+    groupId: org.mockito
+    artifactId: mockito-all
+    version: "1.9.5"
+    jarName: mockito-all-1.9.5.jar
+
+  # junit-4.8.2.jar
+  60bb960e0616e40de8199313d140eb582c57ec9b:
+    groupId: junit
+    artifactId: junit
+    version: "4.8.2"
+    jarName: junit-4.8.2.jar
+
+  # activemq-core-5.7.0.jar
+  1e07c5849fbb28bac3bf2528a801758fc58db6af:
+    groupId: org.apache.activemq
+    artifactId: activemq-core
+    version: "5.7.0"
+    jarName: activemq-core-5.7.0.jar
+
+  # activemq-pool-5.7.0.jar
+  542e94034490311488f51808a7581280ce0fb67f:
+    groupId: org.apache.activemq
+    artifactId: activemq-pool
+    version: "5.7.0"
+    jarName: activemq-pool-5.7.0.jar
+
+  # spring-jms-4.3.21.RELEASE.jar
+  69e096c025caa4ac1e8fc0b12f5ae0ce6826e455:
+    groupId: org.springframework
+    artifactId: spring-jms
+    version: "4.3.21.RELEASE"
+    jarName: spring-jms-4.3.21.RELEASE.jar
+
+  # spring-test-4.3.21.RELEASE.jar
+  98d58cf9828c4f977823153ad5ac5cc5612136f7:
+    groupId: org.springframework
+    artifactId: spring-test
+    version: "4.3.21.RELEASE"
+    jarName: spring-test-4.3.21.RELEASE.jar
+
+  # commons-logging-1.2.jar
+  4bfc12adfe4842bf07b657f0369c4cb522955686:
+    groupId: commons-logging
+    artifactId: commons-logging
+    version: "1.2"
+    jarName: commons-logging-1.2.jar
+
+  # slf4j-log4j12-1.7.25.jar
+  110cefe2df103412849d72ef7a67e4e91e4266b4:
+    groupId: org.slf4j
+    artifactId: slf4j-log4j12
+    version: "1.7.25"
+    jarName: slf4j-log4j12-1.7.25.jar
+
+  # guava-26.0-jre.jar
+  6a806eff209f36f635f943e16d97491f00f6bfab:
+    groupId: com.google.guava
+    artifactId: guava
+    version: "26.0-jre"
+    jarName: guava-26.0-jre.jar
+
+  # spring-context-4.3.21.RELEASE.jar
+  5264ce9d8039d48684ce3fc25eb5d214fa46ab5b:
+    groupId: org.springframework
+    artifactId: spring-context
+    version: "4.3.21.RELEASE"
+    jarName: spring-context-4.3.21.RELEASE.jar
+
+  # aopalliance-1.0.jar
+  0235ba8b489512805ac13a8f9ea77a1ca5ebe3e8:
+    groupId: aopalliance
+    artifactId: aopalliance
+    version: "1.0"
+    jarName: aopalliance-1.0.jar
+
+  # commons-configuration-1.6.jar
+  32cadde23955d7681b0d94a2715846d20b425235:
+    groupId: commons-configuration
+    artifactId: commons-configuration
+    version: "1.6"
+    jarName: commons-configuration-1.6.jar
+
+  # spring-core-4.3.21.RELEASE.jar
+  baca8fcf544214f08fe594ba092d6fa88900a74e:
+    groupId: org.springframework
+    artifactId: spring-core
+    version: "4.3.21.RELEASE"
+    jarName: spring-core-4.3.21.RELEASE.jar
+
+  # aspectjrt-1.8.9.jar
+  87372d9e2323313bec24b09a325bfea8ae0eb867:
+    groupId: org.aspectj
+    artifactId: aspectjrt
+    version: "1.8.9"
+    jarName: aspectjrt-1.8.9.jar
+
+  # ojdbc8.jar
+  967c0b1a2d5b1435324de34a9b8018d294f8f47b:
+    groupId: com.oracle.database.jdbc
+    artifactId: ojdbc8
+    version: "19.3.0.0"
+    jarName: ojdbc8.jar
+
+  # slf4j-api-1.7.25.jar
+  da76ca59f6a57ee3102f8f9bd9cee742973efa8a:
+    groupId: org.slf4j
+    artifactId: slf4j-api
+    version: "1.7.25"
+    jarName: slf4j-api-1.7.25.jar
+
+  # aspectjweaver-1.8.9.jar
+  db28774f477f07220eac18d5ec9c4e01f48589d7:
+    groupId: org.aspectj
+    artifactId: aspectjweaver
+    version: "1.8.9"
+    jarName: aspectjweaver-1.8.9.jar
+
+  # spring-tx-3.2.18.RELEASE.jar
+  fdd56c7f7ac4ee463bae12ddcb2edb0afccbdde6:
+    groupId: org.springframework
+    artifactId: spring-tx
+    version: "3.2.18.RELEASE"
+    jarName: spring-tx-3.2.18.RELEASE.jar
+
+  # xstream-1.3.jar
+  3f755b1a46744302712b1b962c4ab64de392f477:
+    groupId: com.thoughtworks.xstream
+    artifactId: xstream
+    version: "1.3"
+    jarName: xstream-1.3.jar
+
+  # wsdl4j.jar
+  bd804633b9c2cf06258641febc31a8ff3b0906bc:
+    groupId: wsdl4j
+    artifactId: wsdl4j
+    version: "1.5.1"
+    jarName: wsdl4j.jar
+
+  # log4j-1.2.17.jar
+  5af35056b4d257e4b64b9e8069c0746e8b08629f:
+    groupId: org.zenframework.z8.dependencies.commons
+    artifactId: log4j-1.2.17
+    version: "2.0"
+    jarName: log4j-1.2.17.jar
+
+  # commons-discovery.jar
+  7773ac7a7248f08ed2b8d297c6e2ef28260640ea:
+    groupId: commons-discovery
+    artifactId: commons-discovery
+    version: "0.2"
+    jarName: commons-discovery.jar
+
+  # spring-expression-4.3.21.RELEASE.jar
+  00e69cc3105026235d4b91cb1c51c25ce125f0b7:
+    groupId: org.springframework
+    artifactId: spring-expression
+    version: "4.3.21.RELEASE"
+    jarName: spring-expression-4.3.21.RELEASE.jar
+
+  # spring-xml-2.4.5.RELEASE.jar
+  9b401bf812f6ded80cbceba0cf39fa15ddfb5d70:
+    groupId: org.springframework.ws
+    artifactId: spring-xml
+    version: "2.4.5.RELEASE"
+    jarName: spring-xml-2.4.5.RELEASE.jar
+
+  # spring-aop-4.3.21.RELEASE.jar
+  e29ad56774c2e8d685b2628a1cd7df217e8e76b9:
+    groupId: org.springframework
+    artifactId: spring-aop
+    version: "4.3.21.RELEASE"
+    jarName: spring-aop-4.3.21.RELEASE.jar
+
+  # guava-11.0.2.jar
+  35a3c69e19d72743cac83778aecbee68680f63eb:
+    groupId: com.google.guava
+    artifactId: guava
+    version: "11.0.2"
+    jarName: guava-11.0.2.jar
+
+  # spring-context-support-4.3.21.RELEASE.jar
+  1a95108c75e45a92f7e37891d07e432bc7a7265e:
+    groupId: org.springframework
+    artifactId: spring-context-support
+    version: "4.3.21.RELEASE"
+    jarName: spring-context-support-4.3.21.RELEASE.jar
+
+  # spring-oxm-4.3.21.RELEASE.jar
+  b14930c6b3c0b76ede7cad70e9cceb533076090c:
+    groupId: org.springframework
+    artifactId: spring-oxm
+    version: "4.3.21.RELEASE"
+    jarName: spring-oxm-4.3.21.RELEASE.jar
+
+  # commons-collections-3.2.2.jar
+  8ad72fe39fa8c91eaaf12aadb21e0c3661fe26d5:
+    groupId: commons-collections
+    artifactId: commons-collections
+    version: "3.2.2"
+    jarName: commons-collections-3.2.2.jar
+
+  # spring-jdbc-4.3.21.RELEASE.jar
+  3691a7af0372d73723222c4e0c63db2e58637e8e:
+    groupId: org.springframework
+    artifactId: spring-jdbc
+    version: "4.3.21.RELEASE"
+    jarName: spring-jdbc-4.3.21.RELEASE.jar
+
+  # jettison-1.1.jar
+  1a01a2a1218fcf9faa2cc2a6ced025bdea687262:
+    groupId: org.codehaus.jettison
+    artifactId: jettison
+    version: "1.1"
+    jarName: jettison-1.1.jar
+
+  # spring-webmvc-3.2.18.RELEASE.jar
+  60e5bb3dc9cb83d6cc53628082ec89a57d4832b2:
+    groupId: org.springframework
+    artifactId: spring-webmvc
+    version: "3.2.18.RELEASE"
+    jarName: spring-webmvc-3.2.18.RELEASE.jar
+
+  # commons-lang-2.4.jar
+  16313e02a793435009f1e458fa4af5d879f6fb11:
+    groupId: commons-lang
+    artifactId: commons-lang
+    version: "2.4"
+    jarName: commons-lang-2.4.jar
+
+  # DEPFAB.json-smart-1.3.1.jar
+  69b3835e96d282ec85fc2e1517b8164c45ed639e:
+    groupId: net.minidev
+    artifactId: json-smart
+    version: "1.3.1"
+    jarName: DEPFAB.json-smart-1.3.1.jar
+
+  # commons-pool-1.5.2.jar
+  cbb2362f1b022574fbe020e76480826460fbaee3:
+    groupId: commons-pool
+    artifactId: commons-pool
+    version: "1.5.2"
+    jarName: commons-pool-1.5.2.jar
+
+  # DEPFAB.nimbus-jose-jwt-4.23-jdk16.jar
+  59adf5ae43dfec553b692ead742da34cdd56a422:
+    groupId: com.nimbusds
+    artifactId: nimbus-jose-jwt
+    version: "4.23"
+    jarName: DEPFAB.nimbus-jose-jwt-4.23-jdk16.jar
+
+  # jaxrpc.jar
+  b393f1f0c0d95b68c86d0b1ab2e687bb71f3c075:
+    groupId: axis
+    artifactId: axis-jaxrpc
+    version: "1.4"
+    jarName: jaxrpc.jar
+
+  # spring-beans-4.3.21.RELEASE.jar
+  b189b059b054acd7ea3d07dc028800d471bb72b6:
+    groupId: org.springframework
+    artifactId: spring-beans
+    version: "4.3.21.RELEASE"
+    jarName: spring-beans-4.3.21.RELEASE.jar
+
+  # spring-web-4.3.21.RELEASE.jar
+  64e4d7c10ce844ea093bee12f0bc9afc563ffa33:
+    groupId: org.springframework
+    artifactId: spring-web
+    version: "4.3.21.RELEASE"
+    jarName: spring-web-4.3.21.RELEASE.jar
+
+  # commons-beanutils-1.9.3.jar
+  c845703de334ddc6b4b3cd26835458cb1cba1f3d:
+    groupId: commons-beanutils
+    artifactId: commons-beanutils
+    version: "1.9.3"
+    jarName: commons-beanutils-1.9.3.jar
+
+  # joda-time-1.6.jar
+  5a18504e34c5cbe9259d6fd0123ccf6f16115a41:
+    groupId: joda-time
+    artifactId: joda-time
+    version: "1.6"
+    jarName: joda-time-1.6.jar
+
+  # commons-lang3-3.4.jar
+  5fe28b9518e58819180a43a850fbc0dd24b7c050:
+    groupId: org.apache.commons
+    artifactId: commons-lang3
+    version: "3.4"
+    jarName: commons-lang3-3.4.jar
+
+  # saaj.jar
+  581149d1f391258754354f2acf2b56665d53de2e:
+    groupId: axis
+    artifactId: axis-saaj
+    version: "1.4"
+    jarName: saaj.jar
+
+  # hibernate-validator.jar
+  eac2db0a9d86a9749724fe93d43afffa8106f25e:
+    groupId: org.hibernate
+    artifactId: hibernate-validator
+    version: "4.2.0.Final"
+    jarName: hibernate-validator.jar
+
+  # validation-api.jar
+  b6bd7f9d78f6fdaa3c37dae18a4bd298915f328e:
+    groupId: javax.validation
+    artifactId: validation-api
+    version: "1.0.0.GA"
+    jarName: validation-api.jar
+
+  # slf4j-api.jar
+  ec9b7142625dfa1dcaf22db99ecb7c555ffa714d:
+    groupId: org.slf4j
+    artifactId: slf4j-api
+    version: "1.5.6"
+    jarName: slf4j-api.jar
+
+  # slf4j-log4j.jar
+  688d569f0d3548f2bc7bf1648aba297312b0076a:
+    groupId: org.slf4j
+    artifactId: slf4j-log4j12
+    version: "1.5.6"
+    jarName: slf4j-log4j.jar
+
+  # javax-inject.jar
+  6975da39a7040257bd51d21a231b76c915872d38:
+    groupId: javax.inject
+    artifactId: javax.inject
+    version: "1"
+    jarName: javax-inject.jar
+
+  # spring-aop.jar
+  0c7a17803cc10512e26e285073639543f0c7c764:
+    groupId: org.springframework
+    artifactId: spring-aop
+    version: "3.0.5.RELEASE"
+    jarName: spring-aop.jar
+
+  # spring-asm.jar
+  07f22a0e9f325e6565b4ea56b479ad76311d146b:
+    groupId: org.springframework
+    artifactId: spring-asm
+    version: "3.0.5.RELEASE"
+    jarName: spring-asm.jar
+
+  # spring-beans.jar
+  4b352a9c3b427294e264ca4d460d07417ca9350e:
+    groupId: org.springframework
+    artifactId: spring-beans
+    version: "3.0.5.RELEASE"
+    jarName: spring-beans.jar
+
+  # spring-context.jar
+  6b05e397566cc7750d2d25f81a7441fe1aeecb75:
+    groupId: org.springframework
+    artifactId: spring-context
+    version: "3.0.5.RELEASE"
+    jarName: spring-context.jar
+
+  # spring-core.jar
+  1633e94943d57746ef76910489f1cd71fe667e04:
+    groupId: org.springframework
+    artifactId: spring-core
+    version: "3.0.5.RELEASE"
+    jarName: spring-core.jar
+
+  # spring-expression.jar
+  5b8e53877cb58c94f15a0d8172da3569f4b4f3fb:
+    groupId: org.springframework
+    artifactId: spring-expression
+    version: "3.0.5.RELEASE"
+    jarName: spring-expression.jar
+
+  # aspectjrt.jar
+  0ff58f520e1a304b8a02b8cea8b96b1b8e5b25b0:
+    groupId: org.aspectj
+    artifactId: aspectjrt
+    version: "1.6.6"
+    jarName: aspectjrt.jar
+
+  # spring-test.jar
+  4540fba71d41869a6ed5fb504317f2e702761690:
+    groupId: org.springframework
+    artifactId: spring-test
+    version: "3.0.5.RELEASE"
+    jarName: spring-test.jar
+
+  # spring-aspects.jar
+  13f585a0ee2575778975eea0568ec6947e255e41:
+    groupId: org.springframework
+    artifactId: spring-aspects
+    version: "3.0.5.RELEASE"
+    jarName: spring-aspects.jar
+
+  # spring-transaction.jar
+  91eb9bd9baa61a62590a8093667107cb2c7c8184:
+    groupId: org.springframework
+    artifactId: spring-tx
+    version: "3.0.5.RELEASE"
+    jarName: spring-transaction.jar
+
+  # spring-jms.jar
+  5a880fd07605747e5a641f78fd8039a761c5865e:
+    groupId: org.springframework
+    artifactId: spring-jms
+    version: "3.0.5.RELEASE"
+    jarName: spring-jms.jar
+
+  # spring-oxm.jar
+  40f68d7e580d4a6154baff96c5a42a1945186d49:
+    groupId: org.springframework
+    artifactId: spring-oxm
+    version: "3.0.5.RELEASE"
+    jarName: spring-oxm.jar
+
+  # spring-jdbc.jar
+  2af0bad1d8d681ed2e014b684287acc448ab30cb:
+    groupId: org.springframework
+    artifactId: spring-jdbc
+    version: "3.0.5.RELEASE"
+    jarName: spring-jdbc.jar
+
+  # eclipselink.jar
+  cd2211635f3011e300ca8fedc1ce0e1cf61c175b:
+    groupId: org.eclipse.persistence
+    artifactId: eclipselink
+    version: "2.5.2"
+    jarName: eclipselink.jar
+
+  # h2-1.3.163.jar
+  978de63cea2f9f71c20217ef2e2054d621a940e8:
+    groupId: com.h2database
+    artifactId: h2
+    version: "1.3.163"
+    jarName: h2-1.3.163.jar
+
+  # mockito-all-1.9.5.jar
+  79a8984096fc6591c1e3690e07d41be506356fa5:
+    groupId: org.mockito
+    artifactId: mockito-all
+    version: "1.9.5"
+    jarName: mockito-all-1.9.5.jar
+
+  # junit-4.8.2.jar
+  60bb960e0616e40de8199313d140eb582c57ec9b:
+    groupId: junit
+    artifactId: junit
+    version: "4.8.2"
+    jarName: junit-4.8.2.jar
+
+  # activemq-core-5.7.0.jar
+  1e07c5849fbb28bac3bf2528a801758fc58db6af:
+    groupId: org.apache.activemq
+    artifactId: activemq-core
+    version: "5.7.0"
+    jarName: activemq-core-5.7.0.jar
+
+  # activemq-pool-5.7.0.jar
+  542e94034490311488f51808a7581280ce0fb67f:
+    groupId: org.apache.activemq
+    artifactId: activemq-pool
+    version: "5.7.0"
+    jarName: activemq-pool-5.7.0.jar
+
+  # spring-jms-4.3.21.RELEASE.jar
+  69e096c025caa4ac1e8fc0b12f5ae0ce6826e455:
+    groupId: org.springframework
+    artifactId: spring-jms
+    version: "4.3.21.RELEASE"
+    jarName: spring-jms-4.3.21.RELEASE.jar
+
+  # spring-test-4.3.21.RELEASE.jar
+  98d58cf9828c4f977823153ad5ac5cc5612136f7:
+    groupId: org.springframework
+    artifactId: spring-test
+    version: "4.3.21.RELEASE"
+    jarName: spring-test-4.3.21.RELEASE.jar
+
+  # commons-logging-1.2.jar
+  4bfc12adfe4842bf07b657f0369c4cb522955686:
+    groupId: commons-logging
+    artifactId: commons-logging
+    version: "1.2"
+    jarName: commons-logging-1.2.jar
+
+  # slf4j-log4j12-1.7.25.jar
+  110cefe2df103412849d72ef7a67e4e91e4266b4:
+    groupId: org.slf4j
+    artifactId: slf4j-log4j12
+    version: "1.7.25"
+    jarName: slf4j-log4j12-1.7.25.jar
+
+  # guava-26.0-jre.jar
+  6a806eff209f36f635f943e16d97491f00f6bfab:
+    groupId: com.google.guava
+    artifactId: guava
+    version: "26.0-jre"
+    jarName: guava-26.0-jre.jar
+
+  # spring-context-4.3.21.RELEASE.jar
+  5264ce9d8039d48684ce3fc25eb5d214fa46ab5b:
+    groupId: org.springframework
+    artifactId: spring-context
+    version: "4.3.21.RELEASE"
+    jarName: spring-context-4.3.21.RELEASE.jar
+
+  # aopalliance-1.0.jar
+  0235ba8b489512805ac13a8f9ea77a1ca5ebe3e8:
+    groupId: aopalliance
+    artifactId: aopalliance
+    version: "1.0"
+    jarName: aopalliance-1.0.jar
+
+  # commons-configuration-1.6.jar
+  32cadde23955d7681b0d94a2715846d20b425235:
+    groupId: commons-configuration
+    artifactId: commons-configuration
+    version: "1.6"
+    jarName: commons-configuration-1.6.jar
+
+  # spring-core-4.3.21.RELEASE.jar
+  baca8fcf544214f08fe594ba092d6fa88900a74e:
+    groupId: org.springframework
+    artifactId: spring-core
+    version: "4.3.21.RELEASE"
+    jarName: spring-core-4.3.21.RELEASE.jar
+
+  # aspectjrt-1.8.9.jar
+  87372d9e2323313bec24b09a325bfea8ae0eb867:
+    groupId: org.aspectj
+    artifactId: aspectjrt
+    version: "1.8.9"
+    jarName: aspectjrt-1.8.9.jar
+
+  # ojdbc8.jar
+  967c0b1a2d5b1435324de34a9b8018d294f8f47b:
+    groupId: com.oracle.database.jdbc
+    artifactId: ojdbc8
+    version: "19.3.0.0"
+    jarName: ojdbc8.jar
+
+  # slf4j-api-1.7.25.jar
+  da76ca59f6a57ee3102f8f9bd9cee742973efa8a:
+    groupId: org.slf4j
+    artifactId: slf4j-api
+    version: "1.7.25"
+    jarName: slf4j-api-1.7.25.jar
+
+  # aspectjweaver-1.8.9.jar
+  db28774f477f07220eac18d5ec9c4e01f48589d7:
+    groupId: org.aspectj
+    artifactId: aspectjweaver
+    version: "1.8.9"
+    jarName: aspectjweaver-1.8.9.jar
+
+  # spring-tx-3.2.18.RELEASE.jar
+  fdd56c7f7ac4ee463bae12ddcb2edb0afccbdde6:
+    groupId: org.springframework
+    artifactId: spring-tx
+    version: "3.2.18.RELEASE"
+    jarName: spring-tx-3.2.18.RELEASE.jar
+
+  # xstream-1.3.jar
+  3f755b1a46744302712b1b962c4ab64de392f477:
+    groupId: com.thoughtworks.xstream
+    artifactId: xstream
+    version: "1.3"
+    jarName: xstream-1.3.jar
+
+  # wsdl4j.jar
+  bd804633b9c2cf06258641febc31a8ff3b0906bc:
+    groupId: wsdl4j
+    artifactId: wsdl4j
+    version: "1.5.1"
+    jarName: wsdl4j.jar
+
+  # log4j-1.2.17.jar
+  5af35056b4d257e4b64b9e8069c0746e8b08629f:
+    groupId: org.zenframework.z8.dependencies.commons
+    artifactId: log4j-1.2.17
+    version: "2.0"
+    jarName: log4j-1.2.17.jar
+
+  # commons-discovery.jar
+  7773ac7a7248f08ed2b8d297c6e2ef28260640ea:
+    groupId: commons-discovery
+    artifactId: commons-discovery
+    version: "0.2"
+    jarName: commons-discovery.jar
+
+  # spring-expression-4.3.21.RELEASE.jar
+  00e69cc3105026235d4b91cb1c51c25ce125f0b7:
+    groupId: org.springframework
+    artifactId: spring-expression
+    version: "4.3.21.RELEASE"
+    jarName: spring-expression-4.3.21.RELEASE.jar
+
+  # spring-xml-2.4.5.RELEASE.jar
+  9b401bf812f6ded80cbceba0cf39fa15ddfb5d70:
+    groupId: org.springframework.ws
+    artifactId: spring-xml
+    version: "2.4.5.RELEASE"
+    jarName: spring-xml-2.4.5.RELEASE.jar
+
+  # spring-aop-4.3.21.RELEASE.jar
+  e29ad56774c2e8d685b2628a1cd7df217e8e76b9:
+    groupId: org.springframework
+    artifactId: spring-aop
+    version: "4.3.21.RELEASE"
+    jarName: spring-aop-4.3.21.RELEASE.jar
+
+  # guava-11.0.2.jar
+  35a3c69e19d72743cac83778aecbee68680f63eb:
+    groupId: com.google.guava
+    artifactId: guava
+    version: "11.0.2"
+    jarName: guava-11.0.2.jar
+
+  # spring-context-support-4.3.21.RELEASE.jar
+  1a95108c75e45a92f7e37891d07e432bc7a7265e:
+    groupId: org.springframework
+    artifactId: spring-context-support
+    version: "4.3.21.RELEASE"
+    jarName: spring-context-support-4.3.21.RELEASE.jar
+
+  # spring-oxm-4.3.21.RELEASE.jar
+  b14930c6b3c0b76ede7cad70e9cceb533076090c:
+    groupId: org.springframework
+    artifactId: spring-oxm
+    version: "4.3.21.RELEASE"
+    jarName: spring-oxm-4.3.21.RELEASE.jar
+
+  # commons-collections-3.2.2.jar
+  8ad72fe39fa8c91eaaf12aadb21e0c3661fe26d5:
+    groupId: commons-collections
+    artifactId: commons-collections
+    version: "3.2.2"
+    jarName: commons-collections-3.2.2.jar
+
+  # spring-jdbc-4.3.21.RELEASE.jar
+  3691a7af0372d73723222c4e0c63db2e58637e8e:
+    groupId: org.springframework
+    artifactId: spring-jdbc
+    version: "4.3.21.RELEASE"
+    jarName: spring-jdbc-4.3.21.RELEASE.jar
+
+  # jettison-1.1.jar
+  1a01a2a1218fcf9faa2cc2a6ced025bdea687262:
+    groupId: org.codehaus.jettison
+    artifactId: jettison
+    version: "1.1"
+    jarName: jettison-1.1.jar
+
+  # spring-webmvc-3.2.18.RELEASE.jar
+  60e5bb3dc9cb83d6cc53628082ec89a57d4832b2:
+    groupId: org.springframework
+    artifactId: spring-webmvc
+    version: "3.2.18.RELEASE"
+    jarName: spring-webmvc-3.2.18.RELEASE.jar
+
+  # commons-lang-2.4.jar
+  16313e02a793435009f1e458fa4af5d879f6fb11:
+    groupId: commons-lang
+    artifactId: commons-lang
+    version: "2.4"
+    jarName: commons-lang-2.4.jar
+
+  # DEPFAB.json-smart-1.3.1.jar
+  69b3835e96d282ec85fc2e1517b8164c45ed639e:
+    groupId: net.minidev
+    artifactId: json-smart
+    version: "1.3.1"
+    jarName: DEPFAB.json-smart-1.3.1.jar
+
+  # commons-pool-1.5.2.jar
+  cbb2362f1b022574fbe020e76480826460fbaee3:
+    groupId: commons-pool
+    artifactId: commons-pool
+    version: "1.5.2"
+    jarName: commons-pool-1.5.2.jar
+
+  # DEPFAB.nimbus-jose-jwt-4.23-jdk16.jar
+  59adf5ae43dfec553b692ead742da34cdd56a422:
+    groupId: com.nimbusds
+    artifactId: nimbus-jose-jwt
+    version: "4.23"
+    jarName: DEPFAB.nimbus-jose-jwt-4.23-jdk16.jar
+
+  # jaxrpc.jar
+  b393f1f0c0d95b68c86d0b1ab2e687bb71f3c075:
+    groupId: axis
+    artifactId: axis-jaxrpc
+    version: "1.4"
+    jarName: jaxrpc.jar
+
+  # spring-beans-4.3.21.RELEASE.jar
+  b189b059b054acd7ea3d07dc028800d471bb72b6:
+    groupId: org.springframework
+    artifactId: spring-beans
+    version: "4.3.21.RELEASE"
+    jarName: spring-beans-4.3.21.RELEASE.jar
+
+  # spring-web-4.3.21.RELEASE.jar
+  64e4d7c10ce844ea093bee12f0bc9afc563ffa33:
+    groupId: org.springframework
+    artifactId: spring-web
+    version: "4.3.21.RELEASE"
+    jarName: spring-web-4.3.21.RELEASE.jar
+
+  # commons-beanutils-1.9.3.jar
+  c845703de334ddc6b4b3cd26835458cb1cba1f3d:
+    groupId: commons-beanutils
+    artifactId: commons-beanutils
+    version: "1.9.3"
+    jarName: commons-beanutils-1.9.3.jar
+
+  # joda-time-1.6.jar
+  5a18504e34c5cbe9259d6fd0123ccf6f16115a41:
+    groupId: joda-time
+    artifactId: joda-time
+    version: "1.6"
+    jarName: joda-time-1.6.jar
+
+  # commons-lang3-3.4.jar
+  5fe28b9518e58819180a43a850fbc0dd24b7c050:
+    groupId: org.apache.commons
+    artifactId: commons-lang3
+    version: "3.4"
+    jarName: commons-lang3-3.4.jar
+
+  # saaj.jar
+  581149d1f391258754354f2acf2b56665d53de2e:
+    groupId: axis
+    artifactId: axis-saaj
+    version: "1.4"
+    jarName: saaj.jar
+
+  # hibernate-validator.jar
+  eac2db0a9d86a9749724fe93d43afffa8106f25e:
+    groupId: org.hibernate
+    artifactId: hibernate-validator
+    version: "4.2.0.Final"
+    jarName: hibernate-validator.jar
+
+  # validation-api.jar
+  b6bd7f9d78f6fdaa3c37dae18a4bd298915f328e:
+    groupId: javax.validation
+    artifactId: validation-api
+    version: "1.0.0.GA"
+    jarName: validation-api.jar
+
+  # slf4j-api.jar
+  ec9b7142625dfa1dcaf22db99ecb7c555ffa714d:
+    groupId: org.slf4j
+    artifactId: slf4j-api
+    version: "1.5.6"
+    jarName: slf4j-api.jar
+
+  # slf4j-log4j.jar
+  688d569f0d3548f2bc7bf1648aba297312b0076a:
+    groupId: org.slf4j
+    artifactId: slf4j-log4j12
+    version: "1.5.6"
+    jarName: slf4j-log4j.jar
+
+  # javax-inject.jar
+  6975da39a7040257bd51d21a231b76c915872d38:
+    groupId: javax.inject
+    artifactId: javax.inject
+    version: "1"
+    jarName: javax-inject.jar
+
+  # spring-aop.jar
+  0c7a17803cc10512e26e285073639543f0c7c764:
+    groupId: org.springframework
+    artifactId: spring-aop
+    version: "3.0.5.RELEASE"
+    jarName: spring-aop.jar
+
+  # spring-asm.jar
+  07f22a0e9f325e6565b4ea56b479ad76311d146b:
+    groupId: org.springframework
+    artifactId: spring-asm
+    version: "3.0.5.RELEASE"
+    jarName: spring-asm.jar
+
+  # spring-beans.jar
+  4b352a9c3b427294e264ca4d460d07417ca9350e:
+    groupId: org.springframework
+    artifactId: spring-beans
+    version: "3.0.5.RELEASE"
+    jarName: spring-beans.jar
+
+  # spring-context.jar
+  6b05e397566cc7750d2d25f81a7441fe1aeecb75:
+    groupId: org.springframework
+    artifactId: spring-context
+    version: "3.0.5.RELEASE"
+    jarName: spring-context.jar
+
+  # spring-core.jar
+  1633e94943d57746ef76910489f1cd71fe667e04:
+    groupId: org.springframework
+    artifactId: spring-core
+    version: "3.0.5.RELEASE"
+    jarName: spring-core.jar
+
+  # spring-expression.jar
+  5b8e53877cb58c94f15a0d8172da3569f4b4f3fb:
+    groupId: org.springframework
+    artifactId: spring-expression
+    version: "3.0.5.RELEASE"
+    jarName: spring-expression.jar
+
+  # aspectjrt.jar
+  0ff58f520e1a304b8a02b8cea8b96b1b8e5b25b0:
+    groupId: org.aspectj
+    artifactId: aspectjrt
+    version: "1.6.6"
+    jarName: aspectjrt.jar
+
+  # spring-test.jar
+  4540fba71d41869a6ed5fb504317f2e702761690:
+    groupId: org.springframework
+    artifactId: spring-test
+    version: "3.0.5.RELEASE"
+    jarName: spring-test.jar
+
+  # spring-aspects.jar
+  13f585a0ee2575778975eea0568ec6947e255e41:
+    groupId: org.springframework
+    artifactId: spring-aspects
+    version: "3.0.5.RELEASE"
+    jarName: spring-aspects.jar
+
+  # spring-transaction.jar
+  91eb9bd9baa61a62590a8093667107cb2c7c8184:
+    groupId: org.springframework
+    artifactId: spring-tx
+    version: "3.0.5.RELEASE"
+    jarName: spring-transaction.jar
+
+  # spring-jms.jar
+  5a880fd07605747e5a641f78fd8039a761c5865e:
+    groupId: org.springframework
+    artifactId: spring-jms
+    version: "3.0.5.RELEASE"
+    jarName: spring-jms.jar
+
+  # spring-oxm.jar
+  40f68d7e580d4a6154baff96c5a42a1945186d49:
+    groupId: org.springframework
+    artifactId: spring-oxm
+    version: "3.0.5.RELEASE"
+    jarName: spring-oxm.jar
+
+  # spring-jdbc.jar
+  2af0bad1d8d681ed2e014b684287acc448ab30cb:
+    groupId: org.springframework
+    artifactId: spring-jdbc
+    version: "3.0.5.RELEASE"
+    jarName: spring-jdbc.jar
+
+  # eclipselink.jar
+  cd2211635f3011e300ca8fedc1ce0e1cf61c175b:
+    groupId: org.eclipse.persistence
+    artifactId: eclipselink
+    version: "2.5.2"
+    jarName: eclipselink.jar

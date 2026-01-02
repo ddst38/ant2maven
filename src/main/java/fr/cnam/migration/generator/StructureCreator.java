@@ -4,6 +4,7 @@ import fr.cnam.migration.config.JarNameCleaner;
 import fr.cnam.migration.model.AnalysisResult;
 import fr.cnam.migration.model.DependencyInfo;
 import fr.cnam.migration.model.JarInfo;
+import fr.cnam.migration.model.ModuleInfo;
 import fr.cnam.migration.model.ProjectStructure;
 import fr.cnam.migration.model.ProjectType;
 import org.slf4j.Logger;
@@ -58,6 +59,96 @@ public class StructureCreator {
         copyInternalJars(project, liblocale);
 
         log.info("Directory structure created successfully");
+    }
+
+    /**
+     * Crée la structure complète des répertoires Maven pour un projet multi-module.
+     */
+    public void createMultiModuleStructure(ProjectStructure project, Path outputDir) throws IOException {
+        log.info("Creating multi-module Maven structure in: {}", outputDir);
+
+        // Créer les répertoires parents
+        Files.createDirectories(outputDir);
+
+        // Créer le répertoire liblocale
+        Path liblocale = outputDir.resolve("liblocale");
+        Files.createDirectories(liblocale);
+
+        // Créer la structure pour chaque module
+        for (ModuleInfo module : project.getModulesInBuildOrder()) {
+            Path moduleDir = outputDir.resolve(module.artifactId());
+
+            switch (module.type()) {
+                case JAR -> createJarModuleStructure(module, moduleDir);
+                case WAR -> createWarModuleStructure(module, moduleDir);
+                case EAR -> createEarModuleStructure(moduleDir);
+                case TEST -> createJarModuleStructure(module, moduleDir);
+            }
+
+            // Copier les fichiers sources
+            copyModuleSources(module, moduleDir, project);
+        }
+
+        // Copier la configuration EAR
+        ModuleInfo earModule = project.getModulesInBuildOrder().stream()
+            .filter(m -> m.type() == ModuleInfo.ModuleType.EAR)
+            .findFirst()
+            .orElse(null);
+        if (earModule != null) {
+            copyEarConfiguration(project, outputDir.resolve(earModule.artifactId()));
+        }
+
+        log.info("Multi-module directory structure created successfully");
+    }
+
+    /**
+     * Crée la structure d'un module JAR.
+     */
+    private void createJarModuleStructure(ModuleInfo module, Path moduleDir) throws IOException {
+        Files.createDirectories(moduleDir.resolve("src/main/java"));
+        if (module.resourceDir() != null) {
+            Files.createDirectories(moduleDir.resolve("src/main/resources"));
+        }
+        if (module.type() == ModuleInfo.ModuleType.TEST) {
+            Files.createDirectories(moduleDir.resolve("src/test/java"));
+            Files.createDirectories(moduleDir.resolve("src/test/resources"));
+        }
+    }
+
+    /**
+     * Crée la structure d'un module WAR.
+     */
+    private void createWarModuleStructure(ModuleInfo module, Path moduleDir) throws IOException {
+        Files.createDirectories(moduleDir.resolve("src/main/java"));
+        Files.createDirectories(moduleDir.resolve("src/main/resources"));
+        Files.createDirectories(moduleDir.resolve("src/main/webapp/WEB-INF"));
+    }
+
+    /**
+     * Copie les sources d'un module.
+     */
+    private void copyModuleSources(ModuleInfo module, Path moduleDir, ProjectStructure project) throws IOException {
+        // Copier les sources Java
+        if (module.sourceDir() != null && Files.exists(module.sourceDir())) {
+            Path targetJava = moduleDir.resolve("src/main/java");
+            copyDirectory(module.sourceDir(), targetJava, path -> path.toString().endsWith(".java"));
+            log.info("Copied Java sources for module: {}", module.artifactId());
+        }
+
+        // Copier les ressources (conf/)
+        if (module.resourceDir() != null && Files.exists(module.resourceDir())) {
+            Path targetResources = moduleDir.resolve("src/main/resources");
+            copyDirectory(module.resourceDir(), targetResources, path -> !isExcludedConfig(path));
+            log.info("Copied resources for module: {}", module.artifactId());
+        }
+
+        // Copier le webapp pour les modules WAR
+        if (module.type() == ModuleInfo.ModuleType.WAR && module.webappDir() != null && Files.exists(module.webappDir())) {
+            Path targetWebapp = moduleDir.resolve("src/main/webapp");
+            copyDirectory(module.webappDir(), targetWebapp,
+                path -> !path.toString().contains("WEB-INF" + FileSystems.getDefault().getSeparator() + "lib"));
+            log.info("Copied webapp for module: {}", module.artifactId());
+        }
     }
 
     private void createWebModuleStructure(Path webModule) throws IOException {
@@ -356,5 +447,54 @@ public class StructureCreator {
                name.equals("jdbc.properties") ||
                name.equals("log4j.properties") ||
                name.equals("log4j2.xml");
+    }
+
+    /**
+     * Copie les répertoires install/ vers le projet Maven pour le module de distribution.
+     * Copie install/conf et install/script depuis le projet source vers le projet migré.
+     *
+     * @param project Structure du projet source
+     * @param outputDir Répertoire de sortie du projet Maven
+     */
+    public void copyInstallDirectories(ProjectStructure project, Path outputDir) throws IOException {
+        ProjectStructure.DistributionConfig distConfig = project.distributionConfig();
+        if (distConfig == null || !distConfig.hasDistribution()) {
+            return;
+        }
+
+        Path installDir = outputDir.resolve("install");
+        Files.createDirectories(installDir);
+
+        // Copier install/conf
+        if (distConfig.installConfPath() != null && Files.exists(distConfig.installConfPath())) {
+            Path targetConf = installDir.resolve("conf");
+            copyDirectory(distConfig.installConfPath(), targetConf, path -> true);
+            log.info("Copied install/conf directory");
+        }
+
+        // Copier install/script
+        if (distConfig.installScriptPath() != null && Files.exists(distConfig.installScriptPath())) {
+            Path targetScript = installDir.resolve("script");
+            copyDirectory(distConfig.installScriptPath(), targetScript, path -> true);
+            log.info("Copied install/script directory");
+        }
+
+        // Créer le répertoire install/liv (vide, sera rempli par le build)
+        Path livDir = installDir.resolve("liv");
+        Files.createDirectories(livDir);
+        log.info("Created install/liv directory for distribution output");
+    }
+
+    /**
+     * Crée la structure du module de distribution.
+     *
+     * @param outputDir Répertoire de sortie du projet Maven
+     * @param moduleName Nom du module dist (ex: r0-dist)
+     */
+    public void createDistModuleStructure(Path outputDir, String moduleName) throws IOException {
+        Path distModule = outputDir.resolve(moduleName);
+        Path assemblyDir = distModule.resolve("src/assembly");
+        Files.createDirectories(assemblyDir);
+        log.info("Created dist module structure: {}", moduleName);
     }
 }

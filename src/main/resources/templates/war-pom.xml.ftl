@@ -16,30 +16,7 @@
 
     <name>${artifactId}</name>
 
-    <dependencies>
-        <!-- Servlet API - fourni par le serveur d'applications -->
-        <dependency>
-            <groupId>javax.servlet</groupId>
-            <artifactId>javax.servlet-api</artifactId>
-            <version>3.1.0</version>
-            <scope>provided</scope>
-        </dependency>
-<#list dependencies as dep>
-        <dependency>
-            <groupId>${dep.groupId}</groupId>
-            <artifactId>${dep.artifactId}</artifactId>
-<#if dep.version??>
-            <version>${dep.version}</version>
-</#if>
-<#if dep.scope?? && dep.scope != "compile">
-            <scope>${dep.scope}</scope>
-</#if>
-<#if dep.classifier??>
-            <classifier>${dep.classifier}</classifier>
-</#if>
-        </dependency>
-</#list>
-    </dependencies>
+<#-- Dependances heritees du parent pom -->
 
     <build>
         <finalName>${warName}</finalName>
