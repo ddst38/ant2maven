@@ -15,8 +15,8 @@
 
     <properties>
         <project.build.sourceEncoding>ISO-8859-1</project.build.sourceEncoding>
-        <maven.compiler.source>21</maven.compiler.source>
-        <maven.compiler.target>21</maven.compiler.target>
+        <maven.compiler.source>8</maven.compiler.source>
+        <maven.compiler.target>8</maven.compiler.target>
 <#list properties as name, value>
         <${name}>${value}</${name}>
 </#list>
@@ -46,7 +46,7 @@
                     <artifactId>maven-compiler-plugin</artifactId>
                     <version>3.11.0</version>
                     <configuration>
-                        <release>21</release>
+                        <release>8</release>
                         <encoding>${r"${project.build.sourceEncoding}"}</encoding>
                     </configuration>
                 </plugin>
