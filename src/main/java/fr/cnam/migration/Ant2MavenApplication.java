@@ -9,6 +9,7 @@ import fr.cnam.migration.generator.ProjectGenerator;
 import fr.cnam.migration.model.AnalysisResult;
 import fr.cnam.migration.model.ProjectStructure;
 import fr.cnam.migration.report.ReportGenerator;
+import fr.cnam.migration.report.ReportUiClient;
 import fr.cnam.migration.scanner.ProjectScanner;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -107,6 +108,14 @@ public class Ant2MavenApplication implements Callable<Integer> {
         description = "Repertoire des librairies provided (defaut: lib-provided dans ant2maven)"
     )
     private Path libProvidedDir;
+
+    // === Option ReportUI ===
+
+    @Option(
+        names = {"--report-ui-url"},
+        description = "URL du serveur ReportUI pour soumettre le rapport (ex: http://localhost:8090)"
+    )
+    private String reportUiUrl;
 
     // === Options Artifactory ===
 
@@ -289,6 +298,7 @@ public class Ant2MavenApplication implements Callable<Integer> {
             }
 
             // Phase 4 : Auto-fix (si active)
+            AutoFixResult fixResult = null;
             if (autoFix) {
                 log.info("");
                 Path effectiveLibProvided = libProvidedDir;
@@ -299,7 +309,7 @@ public class Ant2MavenApplication implements Callable<Integer> {
 
                 if (effectiveLibProvided != null) {
                     AutoFixService autoFixService = new AutoFixService();
-                    AutoFixResult fixResult = autoFixService.fix(result.outputDir(), effectiveLibProvided);
+                    fixResult = autoFixService.fix(result.outputDir(), effectiveLibProvided);
                     autoFixService.printSummary(fixResult);
 
                     // Régénérer le rapport HTML avec le résultat auto-fix
@@ -311,6 +321,18 @@ public class Ant2MavenApplication implements Callable<Integer> {
                     }
                 } else {
                     log.warn("Repertoire lib-provided non trouve. Utilisez --lib-provided pour specifier le chemin.");
+                }
+            }
+
+            // Soumettre le rapport à ReportUI si configuré (après auto-fix pour inclure les provided)
+            if (reportUiUrl != null && !reportUiUrl.isBlank()) {
+                log.info("");
+                log.info("Submitting report to ReportUI at {}...", reportUiUrl);
+                try {
+                    ReportUiClient reportUiClient = new ReportUiClient(reportUiUrl, config.basePackage());
+                    reportUiClient.submitReport(project, analysis, fixResult);
+                } catch (Exception e) {
+                    log.warn("Failed to submit report to ReportUI: {}", e.getMessage());
                 }
             }
 
