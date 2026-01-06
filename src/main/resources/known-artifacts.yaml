@@ -1504,3 +1504,374 @@ knownArtifacts:
     artifactId: servlet-api-2.5
     version: "2.0"
     jarName: servlet-api-2.5.jar
+
+  # jaxb-impl-2.2.7.jar
+  a29e53347934e694c9551981cecd242fad05022b:
+    groupId: com.sun.xml.bind
+    artifactId: jaxb-impl
+    version: "2.2.7"
+    jarName: jaxb-impl-2.2.7.jar
+
+  # jaxb-api-2.2.7.jar
+  2f51c4bb4724ea408096ee9100ff2827e07e5b7c:
+    groupId: javax.xml.bind
+    artifactId: jaxb-api
+    version: "2.2.7"
+    jarName: jaxb-api-2.2.7.jar
+
+  # spring-oxm-4.2.5.RELEASE.jar
+  a557a238342412a2c8a238dc01fb735565d1d871:
+    groupId: org.springframework
+    artifactId: spring-oxm
+    version: "4.2.5.RELEASE"
+    jarName: spring-oxm-4.2.5.RELEASE.jar
+
+  # postgresql-9.2-1004-jdbc4.jar
+  77e7e7df83aa0e212b788ff43ab697d534389e59:
+    groupId: org.postgresql
+    artifactId: postgresql
+    version: "9.2-1004-jdbc4"
+    jarName: postgresql-9.2-1004-jdbc4.jar
+
+  # slf4j-api-1.7.22.jar
+  a1c83373863cec7ae8d89dc1c5722d8cb6ec0309:
+    groupId: org.slf4j
+    artifactId: slf4j-api
+    version: "1.7.22"
+    jarName: slf4j-api-1.7.22.jar
+
+  # spring-aop-4.2.5.RELEASE.jar
+  858d6c70909b3ce7e07b59fc936f8ccfcd81c0aa:
+    groupId: org.springframework
+    artifactId: spring-aop
+    version: "4.2.5.RELEASE"
+    jarName: spring-aop-4.2.5.RELEASE.jar
+
+  # camel-spring-2.14.1.jar
+  a31b38a85147bf1ecd82b0ee3f76435b2e1694e1:
+    groupId: org.apache.camel
+    artifactId: camel-spring
+    version: "2.14.1"
+    jarName: camel-spring-2.14.1.jar
+
+  # spring-test-4.2.5.RELEASE.jar
+  60bd0ac25869d515717284b77644d0416d3a38c5:
+    groupId: org.springframework
+    artifactId: spring-test
+    version: "4.2.5.RELEASE"
+    jarName: spring-test-4.2.5.RELEASE.jar
+
+  # logback-classic-1.1.2.jar
+  b316e9737eea25e9ddd6d88eaeee76878045c6b2:
+    groupId: ch.qos.logback
+    artifactId: logback-classic
+    version: "1.1.2"
+    jarName: logback-classic-1.1.2.jar
+
+  # FastInfoset-1.2.12.jar
+  e8c1c096162a146c2d84135c5036edf54c1b1d38:
+    groupId: com.sun.xml.fastinfoset
+    artifactId: FastInfoset
+    version: "1.2.12"
+    jarName: FastInfoset-1.2.12.jar
+
+  # guava-20.0.jar
+  89507701249388e1ed5ddcf8c41f4ce1be7831ef:
+    groupId: com.google.guava
+    artifactId: guava
+    version: "20.0"
+    jarName: guava-20.0.jar
+
+  # com.ibm.jbatch-tck-spi-1.0.jar
+  8ac869b0a60bff1a15eba0fb6398942410396938:
+    groupId: com.ibm.jbatch
+    artifactId: com.ibm.jbatch-tck-spi
+    version: "1.0"
+    jarName: com.ibm.jbatch-tck-spi-1.0.jar
+
+  # jaxb-core-2.2.7.jar
+  f327817188a7dce503ae3c667c5931077630b0a1:
+    groupId: com.sun.xml.bind
+    artifactId: jaxb-core
+    version: "2.2.7"
+    jarName: jaxb-core-2.2.7.jar
+
+  # ojdbc6-11.2.0.4.0.jar
+  a483a046eee2f404d864a6ff5b09dc0e1be3fe6c:
+    groupId: com.oracle.database.jdbc
+    artifactId: ojdbc6
+    version: "11.2.0.4"
+    jarName: ojdbc6-11.2.0.4.0.jar
+
+  # javax.batch-api-1.0.1.jar
+  2562072ef44e364529ebf7c48cf44e4568cbd8f5:
+    groupId: javax.batch
+    artifactId: javax.batch-api
+    version: "1.0.1"
+    jarName: javax.batch-api-1.0.1.jar
+
+  # spring-context-4.2.5.RELEASE.jar
+  a75e18322c7b362fe1daa26a245ae672ec0f3138:
+    groupId: org.springframework
+    artifactId: spring-context
+    version: "4.2.5.RELEASE"
+    jarName: spring-context-4.2.5.RELEASE.jar
+
+  # camel-core-2.14.1.jar
+  4155a8868a079241d064edffa483efec392e5935:
+    groupId: org.apache.camel
+    artifactId: camel-core
+    version: "2.14.1"
+    jarName: camel-core-2.14.1.jar
+
+  # spring-batch-core-3.0.6.RELEASE.jar
+  60aba4ee3e63d32636f296d671f05d7448639fa3:
+    groupId: org.springframework.batch
+    artifactId: spring-batch-core
+    version: "3.0.6.RELEASE"
+    jarName: spring-batch-core-3.0.6.RELEASE.jar
+
+  # commons-compress-1.12.jar
+  84caa68576e345eb5e7ae61a0e5a9229eb100d7b:
+    groupId: org.apache.commons
+    artifactId: commons-compress
+    version: "1.12"
+    jarName: commons-compress-1.12.jar
+
+  # spring-expression-4.2.5.RELEASE.jar
+  a42bdfb833d0be6c18429aea3fb0fba81f85c6e8:
+    groupId: org.springframework
+    artifactId: spring-expression
+    version: "4.2.5.RELEASE"
+    jarName: spring-expression-4.2.5.RELEASE.jar
+
+  # jcl-over-slf4j-1.7.22.jar
+  86ceac14535af5a42c8fb0d06d79b925dd3cb263:
+    groupId: org.slf4j
+    artifactId: jcl-over-slf4j
+    version: "1.7.22"
+    jarName: jcl-over-slf4j-1.7.22.jar
+
+  # commons-lang3-3.3.1.jar
+  6738a2da2202ce360f0af90aba005c1e05a2c4cd:
+    groupId: org.apache.commons
+    artifactId: commons-lang3
+    version: "3.3.1"
+    jarName: commons-lang3-3.3.1.jar
+
+  # log4j-over-slf4j-1.7.22.jar
+  a527c37e9ca6c3d19ba298edd4aa344ca751a203:
+    groupId: org.slf4j
+    artifactId: log4j-over-slf4j
+    version: "1.7.22"
+    jarName: log4j-over-slf4j-1.7.22.jar
+
+  # hamcrest-all-1.3.jar
+  63a21ebc981131004ad02e0434e799fd7f3a8d5a:
+    groupId: org.hamcrest
+    artifactId: hamcrest-all
+    version: "1.3"
+    jarName: hamcrest-all-1.3.jar
+
+  # xstream-1.4.7.jar
+  bce3282142b63068260f021fcbe48b72e8d71a1a:
+    groupId: com.thoughtworks.xstream
+    artifactId: xstream
+    version: "1.4.7"
+    jarName: xstream-1.4.7.jar
+
+  # spring-retry-1.1.2.RELEASE.jar
+  949a23beb82ebe31d7a1d47022353b8338c4da11:
+    groupId: org.springframework.retry
+    artifactId: spring-retry
+    version: "1.1.2.RELEASE"
+    jarName: spring-retry-1.1.2.RELEASE.jar
+
+  # spring-context-support-4.2.5.RELEASE.jar
+  72db9c52e8bd2dc3290cd51114583731f818356b:
+    groupId: org.springframework
+    artifactId: spring-context-support
+    version: "4.2.5.RELEASE"
+    jarName: spring-context-support-4.2.5.RELEASE.jar
+
+  # spring-jdbc-4.2.5.RELEASE.jar
+  205d2f1b902eac16a2ece772dc5ac6090b7e0b6f:
+    groupId: org.springframework
+    artifactId: spring-jdbc
+    version: "4.2.5.RELEASE"
+    jarName: spring-jdbc-4.2.5.RELEASE.jar
+
+  # spring-batch-test-3.0.6.RELEASE.jar
+  6e632782ae26d5765d76b94d5c317165a6ed4e3d:
+    groupId: org.springframework.batch
+    artifactId: spring-batch-test
+    version: "3.0.6.RELEASE"
+    jarName: spring-batch-test-3.0.6.RELEASE.jar
+
+  # joda-time-2.6.jar
+  5015880733b0bc0ce813a3ed5601064c1d413671:
+    groupId: joda-time
+    artifactId: joda-time
+    version: "2.6"
+    jarName: joda-time-2.6.jar
+
+  # spring-test-dbunit-1.3.0.jar
+  596cab1e9016443d9ea9ffbc0692f4106f54c37d:
+    groupId: com.github.springtestdbunit
+    artifactId: spring-test-dbunit
+    version: "1.3.0"
+    jarName: spring-test-dbunit-1.3.0.jar
+
+  # jsr173_api-1.0.jar
+  c79b8431c3104315c0aeaed7bf23d0ab0edbaa09:
+    groupId: javax.xml.bind
+    artifactId: jsr173_api
+    version: "1.0"
+    jarName: jsr173_api-1.0.jar
+
+  # jettison-1.2.jar
+  0765a6181653f4b05c18c7a9e8f5c1f8269bf9b2:
+    groupId: org.codehaus.jettison
+    artifactId: jettison
+    version: "1.2"
+    jarName: jettison-1.2.jar
+
+  # stax-utils-20070216.jar
+  1d9fc60be26a0482c36b7a04d2c581ddf758b6ea:
+    groupId: net.java.dev.stax-utils
+    artifactId: stax-utils
+    version: "20070216"
+    jarName: stax-utils-20070216.jar
+
+  # xmlpull-1.1.3.1.jar
+  2b8e230d2ab644e4ecaa94db7cdedbc40c805dfa:
+    groupId: xmlpull
+    artifactId: xmlpull
+    version: "1.1.3.1"
+    jarName: xmlpull-1.1.3.1.jar
+
+  # xpp3_min-1.1.4c.jar
+  19d4e90b43059058f6e056f794f0ea4030d60b86:
+    groupId: xpp3
+    artifactId: xpp3_min
+    version: "1.1.4c"
+    jarName: xpp3_min-1.1.4c.jar
+
+  # spring-batch-infrastructure-3.0.6.RELEASE.jar
+  01c7ca193e0e25118c0f57f0199145c7801164b3:
+    groupId: org.springframework.batch
+    artifactId: spring-batch-infrastructure
+    version: "3.0.6.RELEASE"
+    jarName: spring-batch-infrastructure-3.0.6.RELEASE.jar
+
+  # spring-core-4.2.5.RELEASE.jar
+  0251207b29f0f38f61e3495a2f7fb053cf1bfe8c:
+    groupId: org.springframework
+    artifactId: spring-core
+    version: "4.2.5.RELEASE"
+    jarName: spring-core-4.2.5.RELEASE.jar
+
+  # istack-commons-runtime-2.16.jar
+  927eb6fbb003f40d536efd96e7cbcb7ea4c1c2d0:
+    groupId: com.sun.istack
+    artifactId: istack-commons-runtime
+    version: "2.16"
+    jarName: istack-commons-runtime-2.16.jar
+
+  # spring-beans-4.2.5.RELEASE.jar
+  fa992ae40f6fc47117282164e0433b71da385e94:
+    groupId: org.springframework
+    artifactId: spring-beans
+    version: "4.2.5.RELEASE"
+    jarName: spring-beans-4.2.5.RELEASE.jar
+
+  # spring-tx-4.2.5.RELEASE.jar
+  7395321fe937272d9b781a13985e04ab2dcd6210:
+    groupId: org.springframework
+    artifactId: spring-tx
+    version: "4.2.5.RELEASE"
+    jarName: spring-tx-4.2.5.RELEASE.jar
+
+  # logback-core-1.1.2.jar
+  2d23694879c2c12f125dac5076bdfd5d771cc4cb:
+    groupId: ch.qos.logback
+    artifactId: logback-core
+    version: "1.1.2"
+    jarName: logback-core-1.1.2.jar
+
+  # h2-1.3.161.jar
+  97dc9b6589402749a93b6a7bab0bd45952b4c5b4:
+    groupId: com.h2database
+    artifactId: h2
+    version: "1.3.161"
+    jarName: h2-1.3.161.jar
+
+  # objenesis-2.1.jar
+  87c0ea803b69252868d09308b4618f766f135a96:
+    groupId: org.objenesis
+    artifactId: objenesis
+    version: "2.1"
+    jarName: objenesis-2.1.jar
+
+  # mockito-core-1.10.19.jar
+  e8546f5bef4e061d8dd73895b4e8f40e3fe6effe:
+    groupId: org.mockito
+    artifactId: mockito-core
+    version: "1.10.19"
+    jarName: mockito-core-1.10.19.jar
+
+  # jacocoant.jar
+  a2d0fa0d7846567bd5d3a502effd9b42f3ae81f7:
+    groupId: org.jacoco
+    artifactId: org.jacoco.ant
+    version: "0.7.4.201502262128"
+    jarName: jacocoant.jar
+
+  # wstx-lgpl-3.2.8.jar
+  833a57ee3dc3aa7ac347c8dea98dc38de42e4938:
+    groupId: org.codehaus.woodstox
+    artifactId: wstx-lgpl
+    version: "3.2.8"
+    jarName: wstx-lgpl-3.2.8.jar
+
+  # mail-1.4.7.jar
+  9add058589d5d85adeb625859bf2c5eeaaedf12d:
+    groupId: org.zenframework.z8.dependencies.commons
+    artifactId: mail-1.4.7
+    version: "2.0"
+    jarName: mail-1.4.7.jar
+
+  # activation-1.1.jar
+  e6cb541461c2834bdea3eb920f1884d1eb508b50:
+    groupId: javax.activation
+    artifactId: activation
+    version: "1.1"
+    jarName: activation-1.1.jar
+
+  # javax.mail-1.4.7.jar
+  36bafd876978d225a0d2248ee5e97421f3277fd2:
+    groupId: com.sun.mail
+    artifactId: javax.mail
+    version: "1.4.7"
+    jarName: javax.mail-1.4.7.jar
+
+  # mail-1.4.7.jar
+  9add058589d5d85adeb625859bf2c5eeaaedf12d:
+    groupId: org.zenframework.z8.dependencies.commons
+    artifactId: mail-1.4.7
+    version: "2.0"
+    jarName: mail-1.4.7.jar
+
+  # activation-1.1.jar
+  e6cb541461c2834bdea3eb920f1884d1eb508b50:
+    groupId: javax.activation
+    artifactId: activation
+    version: "1.1"
+    jarName: activation-1.1.jar
+
+  # javax.mail-1.4.7.jar
+  36bafd876978d225a0d2248ee5e97421f3277fd2:
+    groupId: com.sun.mail
+    artifactId: javax.mail
+    version: "1.4.7"
+    jarName: javax.mail-1.4.7.jar

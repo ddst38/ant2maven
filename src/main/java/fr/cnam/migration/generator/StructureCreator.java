@@ -497,4 +497,219 @@ public class StructureCreator {
         Files.createDirectories(assemblyDir);
         log.info("Created dist module structure: {}", moduleName);
     }
+
+    /**
+     * Crée la structure de répertoires Maven multi-module pour un projet batch.
+     * Structure:
+     * - {appModuleName}/src/main/java
+     * - {appModuleName}/src/main/resources
+     * - {appModuleName}/src/test/java
+     * - {appModuleName}/src/test/resources
+     * - liblocale/
+     *
+     * @param project Structure du projet batch
+     * @param outputDir Répertoire de sortie
+     * @param appModuleName Nom du module application (ex: prf2-app)
+     */
+    public void createBatchMultiModuleStructure(ProjectStructure project, Path outputDir, String appModuleName) throws IOException {
+        log.info("Creating batch multi-module Maven structure in: {}", outputDir);
+
+        Files.createDirectories(outputDir);
+
+        // Structure du module app
+        Path appModule = outputDir.resolve(appModuleName);
+        Path srcMainJava = appModule.resolve("src/main/java");
+        Path srcMainResources = appModule.resolve("src/main/resources");
+        Path srcTestJava = appModule.resolve("src/test/java");
+        Path srcTestResources = appModule.resolve("src/test/resources");
+        Path liblocale = outputDir.resolve("liblocale");
+
+        Files.createDirectories(srcMainJava);
+        Files.createDirectories(srcMainResources);
+        Files.createDirectories(srcTestJava);
+        Files.createDirectories(srcTestResources);
+        Files.createDirectories(liblocale);
+
+        // Copier les sources vers le module app
+        copyBatchSourcesToModule(project, appModule);
+
+        log.info("Batch multi-module directory structure created successfully");
+    }
+
+    /**
+     * Copie les sources d'un projet batch vers le module app.
+     */
+    private void copyBatchSourcesToModule(ProjectStructure project, Path moduleDir) throws IOException {
+        ProjectStructure.SourceLayout layout = project.sourceLayout();
+
+        // Copier les sources Java principales
+        if (layout.mainJavaDir() != null && Files.exists(layout.mainJavaDir())) {
+            copyDirectory(layout.mainJavaDir(), moduleDir.resolve("src/main/java"), p -> true);
+            log.info("Copied main Java sources to {}", moduleDir.getFileName());
+        }
+
+        // Copier les ressources principales
+        if (layout.mainResourcesDir() != null && Files.exists(layout.mainResourcesDir())) {
+            copyDirectory(layout.mainResourcesDir(), moduleDir.resolve("src/main/resources"),
+                p -> !isExcludedConfig(p));
+            log.info("Copied main resources to {}", moduleDir.getFileName());
+        }
+
+        // Copier les sources de test
+        if (layout.testJavaDir() != null && Files.exists(layout.testJavaDir())) {
+            copyDirectory(layout.testJavaDir(), moduleDir.resolve("src/test/java"), p -> true);
+            log.info("Copied test Java sources to {}", moduleDir.getFileName());
+        }
+
+        // Copier les ressources de test
+        if (layout.testResourcesDir() != null && Files.exists(layout.testResourcesDir())) {
+            copyDirectory(layout.testResourcesDir(), moduleDir.resolve("src/test/resources"), p -> true);
+            log.info("Copied test resources to {}", moduleDir.getFileName());
+        }
+    }
+
+    /**
+     * Copie les fichiers de distribution batch vers le module dist.
+     * - Scripts de lancement → src/main/scripts
+     * - Configuration → src/main/conf
+     *
+     * @param project Structure du projet batch
+     * @param outputDir Répertoire de sortie du projet Maven
+     * @param distModuleName Nom du module dist (ex: prf2-dist)
+     */
+    public void copyBatchDistributionFiles(ProjectStructure project, Path outputDir, String distModuleName) throws IOException {
+        Path distModule = outputDir.resolve(distModuleName);
+
+        // Copier les scripts de lancement
+        if (project.batchConfig() != null && project.batchConfig().launchScripts() != null) {
+            Path targetScripts = distModule.resolve("src/main/scripts");
+            Files.createDirectories(targetScripts);
+
+            for (Path scriptPath : project.batchConfig().launchScripts()) {
+                if (Files.exists(scriptPath)) {
+                    Path target = targetScripts.resolve(scriptPath.getFileName());
+                    Files.copy(scriptPath, target, StandardCopyOption.REPLACE_EXISTING);
+                    target.toFile().setExecutable(true);
+                    log.info("Copied launch script to dist: {}", scriptPath.getFileName());
+                }
+            }
+        }
+
+        // Copier les configurations depuis install/conf si présent
+        Path installConf = project.projectRoot().resolve("install/conf");
+        if (Files.isDirectory(installConf)) {
+            Path targetConf = distModule.resolve("src/main/conf");
+            copyDirectory(installConf, targetConf, p -> true);
+            log.info("Copied configuration templates to dist from install/conf");
+        }
+
+        // Copier install/script si présent
+        Path installScript = project.projectRoot().resolve("install/script");
+        if (Files.isDirectory(installScript)) {
+            Path targetScript = distModule.resolve("src/main/install-scripts");
+            copyDirectory(installScript, targetScript, p -> true);
+            log.info("Copied install scripts to dist from install/script");
+        }
+    }
+
+    /**
+     * Crée la structure de répertoires Maven pour un projet batch (ancienne méthode single-module).
+     *
+     * @param project Structure du projet batch
+     * @param outputDir Répertoire de sortie
+     */
+    @Deprecated
+    public void createBatchStructure(ProjectStructure project, Path outputDir) throws IOException {
+        log.info("Creating batch Maven structure in: {}", outputDir);
+
+        Files.createDirectories(outputDir);
+
+        // Structure Maven standard
+        Path srcMainJava = outputDir.resolve("src/main/java");
+        Path srcMainResources = outputDir.resolve("src/main/resources");
+        Path srcTestJava = outputDir.resolve("src/test/java");
+        Path srcTestResources = outputDir.resolve("src/test/resources");
+        Path srcMainScripts = outputDir.resolve("src/main/scripts");
+        Path srcMainConf = outputDir.resolve("src/main/conf");
+        Path srcAssembly = outputDir.resolve("src/assembly");
+        Path liblocale = outputDir.resolve("liblocale");
+
+        Files.createDirectories(srcMainJava);
+        Files.createDirectories(srcMainResources);
+        Files.createDirectories(srcTestJava);
+        Files.createDirectories(srcTestResources);
+        Files.createDirectories(srcMainScripts);
+        Files.createDirectories(srcMainConf);
+        Files.createDirectories(srcAssembly);
+        Files.createDirectories(liblocale);
+
+        // Copier les sources
+        copyBatchSources(project, outputDir);
+
+        log.info("Batch directory structure created successfully");
+    }
+
+    /**
+     * Copie les sources d'un projet batch.
+     */
+    private void copyBatchSources(ProjectStructure project, Path outputDir) throws IOException {
+        ProjectStructure.SourceLayout layout = project.sourceLayout();
+
+        // Copier les sources Java principales
+        if (layout.mainJavaDir() != null && Files.exists(layout.mainJavaDir())) {
+            copyDirectory(layout.mainJavaDir(), outputDir.resolve("src/main/java"), p -> true);
+            log.info("Copied main Java sources");
+        }
+
+        // Copier les ressources principales
+        if (layout.mainResourcesDir() != null && Files.exists(layout.mainResourcesDir())) {
+            copyDirectory(layout.mainResourcesDir(), outputDir.resolve("src/main/resources"),
+                p -> !isExcludedConfig(p));
+            log.info("Copied main resources");
+        }
+
+        // Copier les sources de test
+        if (layout.testJavaDir() != null && Files.exists(layout.testJavaDir())) {
+            copyDirectory(layout.testJavaDir(), outputDir.resolve("src/test/java"), p -> true);
+            log.info("Copied test Java sources");
+        }
+
+        // Copier les ressources de test
+        if (layout.testResourcesDir() != null && Files.exists(layout.testResourcesDir())) {
+            copyDirectory(layout.testResourcesDir(), outputDir.resolve("src/test/resources"), p -> true);
+            log.info("Copied test resources");
+        }
+    }
+
+    /**
+     * Copie les scripts de lancement batch vers le projet Maven.
+     *
+     * @param project Structure du projet avec la configuration batch
+     * @param outputDir Répertoire de sortie du projet Maven
+     */
+    public void copyLaunchScripts(ProjectStructure project, Path outputDir) throws IOException {
+        if (project.batchConfig() == null || project.batchConfig().launchScripts() == null) {
+            return;
+        }
+
+        Path targetScripts = outputDir.resolve("src/main/scripts");
+        Files.createDirectories(targetScripts);
+
+        for (Path scriptPath : project.batchConfig().launchScripts()) {
+            if (Files.exists(scriptPath)) {
+                Path target = targetScripts.resolve(scriptPath.getFileName());
+                Files.copy(scriptPath, target, StandardCopyOption.REPLACE_EXISTING);
+                target.toFile().setExecutable(true);
+                log.info("Copied launch script: {}", scriptPath.getFileName());
+            }
+        }
+
+        // Copier les configurations depuis install/conf si présent
+        Path installConf = project.projectRoot().resolve("install/conf");
+        if (Files.isDirectory(installConf)) {
+            Path targetConf = outputDir.resolve("src/main/conf");
+            copyDirectory(installConf, targetConf, p -> true);
+            log.info("Copied configuration templates from install/conf");
+        }
+    }
 }

@@ -173,13 +173,17 @@ public class JarScanner {
         // Priorité 3 : Les répertoires de test explicites
         // src/test/ = code de test Maven/Gradle
         // lib/test/ = bibliothèques de test
+        // lib/dependencies/test/ = bibliothèques de test pour projets batch
         if (pathStr.contains("src/test/") || pathStr.contains("src\\test\\") ||
             pathStr.contains("/lib/test/") || pathStr.contains("\\lib\\test\\") ||
-            pathStr.contains("/lib/test") || pathStr.contains("\\lib\\test")) {
+            pathStr.contains("/lib/test") || pathStr.contains("\\lib\\test") ||
+            pathStr.contains("lib/dependencies/test/") || pathStr.contains("lib\\dependencies\\test\\")) {
             return JarInfo.JarCategory.TEST;
         }
 
-        if (pathStr.contains("/provided/") || pathStr.contains("\\provided\\")) {
+        // Priorité 4 : PROVIDED (lib/dependencies/provided/ ou /provided/)
+        if (pathStr.contains("/provided/") || pathStr.contains("\\provided\\") ||
+            pathStr.contains("lib/dependencies/provided/") || pathStr.contains("lib\\dependencies\\provided\\")) {
             return JarInfo.JarCategory.PROVIDED;
         }
 

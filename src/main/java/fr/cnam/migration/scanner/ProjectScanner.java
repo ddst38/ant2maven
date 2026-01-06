@@ -146,6 +146,12 @@ public class ProjectScanner {
             log.info("Parsed {} modules from build.xml", modules.size());
         }
 
+        // Construire la configuration batch si c'est un projet batch
+        BatchConfiguration batchConfig = null;
+        if (type == ProjectType.BATCH) {
+            batchConfig = buildBatchConfiguration(projectRoot, builds);
+        }
+
         return ProjectStructure.builder()
             .name(projectName)
             .projectRoot(projectRoot)
@@ -159,7 +165,65 @@ public class ProjectScanner {
             .earConfig(earConfig)
             .distributionConfig(distConfig)
             .modules(modules)
+            .batchConfig(batchConfig)
             .build();
+    }
+
+    /**
+     * Construit la configuration batch à partir des informations du build.
+     */
+    private BatchConfiguration buildBatchConfiguration(Path projectRoot, List<AntBuildInfo> builds) {
+        BatchConfiguration.Builder builder = BatchConfiguration.builder();
+
+        // Récupérer les informations du build batch
+        AntBuildInfo batchBuild = builds.stream()
+            .filter(b -> "true".equals(b.getProperty("batch.project")))
+            .findFirst()
+            .orElse(null);
+
+        if (batchBuild != null) {
+            String mainClass = batchBuild.getProperty("batch.mainClass");
+            String specTitle = batchBuild.getProperty("batch.specificationTitle");
+            String jarName = batchBuild.getProperty("applicationName");
+            String jarVersion = batchBuild.getProperty("applicationVersion");
+
+            builder.mainClass(mainClass);
+            builder.jarName(jarName);
+            builder.jarVersion(jarVersion != null ? jarVersion : "1.0.0-SNAPSHOT");
+            builder.specificationTitle(specTitle != null ? specTitle : "Spring Batch Application");
+        }
+
+        // Scanner les scripts de lancement
+        List<Path> launchScripts = new ArrayList<>();
+        Path scriptDir = projectRoot.resolve("script");
+        if (Files.isDirectory(scriptDir)) {
+            try (Stream<Path> scripts = Files.list(scriptDir)) {
+                scripts.filter(p -> p.toString().endsWith(".sh"))
+                    .forEach(launchScripts::add);
+            } catch (IOException e) {
+                log.warn("Failed to scan script directory: {}", e.getMessage());
+            }
+        }
+        builder.launchScripts(launchScripts);
+
+        // Détecter le profil PostgreSQL (chercher dans les scripts de lancement)
+        boolean hasPostgresProfile = launchScripts.stream()
+            .anyMatch(p -> {
+                try {
+                    String content = Files.readString(p);
+                    return content.contains("POSTGRESQL") || content.contains("postgresql");
+                } catch (IOException e) {
+                    return false;
+                }
+            });
+        builder.hasPostgresProfile(hasPostgresProfile);
+
+        log.info("Batch configuration: mainClass={}, jarName={}, scripts={}",
+            builder.build().mainClass(),
+            builder.build().jarName(),
+            launchScripts.size());
+
+        return builder.build();
     }
 
     /**
@@ -207,7 +271,13 @@ public class ProjectScanner {
      * Détection générique sans noms de projets codés en dur.
      */
     private ProjectType detectProjectType(Path projectRoot) {
-        // Verifier d'abord si c'est un projet multi-module
+        // Verifier d'abord si c'est un projet batch
+        if (isBatchProject(projectRoot)) {
+            log.info("Detected batch project structure");
+            return ProjectType.BATCH;
+        }
+
+        // Verifier si c'est un projet multi-module
         if (antParser.isMultiModuleProject(projectRoot)) {
             log.info("Detected multi-module project structure");
             return ProjectType.MULTI_MODULE;
@@ -251,6 +321,62 @@ public class ProjectScanner {
     }
 
     /**
+     * Détecte si le projet est un projet batch.
+     * Critères:
+     * - build/build.xml existe
+     * - Pas de WebContent (pas une webapp)
+     * - Script de lancement batch (script/*.sh) ou lib/dependencies/
+     * - Structure src/main/java à la racine (pas de sous-module *-app)
+     */
+    private boolean isBatchProject(Path projectRoot) {
+        // Vérifier si build/build.xml existe
+        Path buildXml = projectRoot.resolve("build/build.xml");
+        boolean hasBuildDir = Files.exists(buildXml);
+        log.debug("Batch detection: build/build.xml exists={} ({})", hasBuildDir, buildXml.toAbsolutePath());
+        if (!hasBuildDir) {
+            return false;
+        }
+
+        // Vérifier qu'il n'y a pas de WebContent (sinon c'est une webapp)
+        boolean hasWebContent = false;
+        try (Stream<Path> dirs = Files.list(projectRoot)) {
+            hasWebContent = dirs
+                .filter(Files::isDirectory)
+                .anyMatch(p -> Files.exists(p.resolve("WebContent")));
+        } catch (IOException ignored) {
+        }
+        log.debug("Batch detection: hasWebContent={}", hasWebContent);
+        if (hasWebContent) {
+            return false;
+        }
+
+        // Vérifier s'il y a des scripts de lancement batch
+        boolean hasScripts = false;
+        Path scriptDir = projectRoot.resolve("script");
+        if (Files.isDirectory(scriptDir)) {
+            try (Stream<Path> files = Files.list(scriptDir)) {
+                hasScripts = files.anyMatch(p -> p.toString().endsWith(".sh"));
+            } catch (IOException ignored) {
+            }
+        }
+        log.debug("Batch detection: hasScripts={} (in {})", hasScripts, scriptDir);
+
+        // Vérifier s'il y a lib/dependencies/ (structure batch typique)
+        boolean hasLibDependencies = Files.isDirectory(projectRoot.resolve("lib/dependencies"));
+        log.debug("Batch detection: hasLibDependencies={}", hasLibDependencies);
+
+        // Vérifier s'il y a une structure src/main/java à la racine (structure batch Maven-style)
+        boolean hasSrcMainJava = Files.isDirectory(projectRoot.resolve("src/main/java"));
+        log.debug("Batch detection: hasSrcMainJava={}", hasSrcMainJava);
+
+        // Un projet batch a soit des scripts soit lib/dependencies, ET une structure src à la racine
+        boolean isBatch = (hasScripts || hasLibDependencies) && hasSrcMainJava;
+        log.debug("Batch detection result: {}", isBatch);
+
+        return isBatch;
+    }
+
+    /**
      * Trouve le répertoire principal de l'application dynamiquement.
      */
     private Path findAppDirectory(Path projectRoot, ProjectType type) {
@@ -288,20 +414,30 @@ public class ProjectScanner {
     private ProjectStructure.SourceLayout analyzeSourceLayout(Path projectRoot, ProjectType type) {
         ProjectStructure.SourceLayout.Builder builder = ProjectStructure.SourceLayout.builder();
 
-        Path appDir = findAppDirectory(projectRoot, type);
-        if (appDir != null) {
-            if (type == ProjectType.MAVEN_STYLE) {
-                builder.mainJavaDir(appDir.resolve("src/main/java"));
-                builder.mainResourcesDir(appDir.resolve("src/main/resources"));
-                builder.testJavaDir(appDir.resolve("src/test/java"));
-                builder.testResourcesDir(appDir.resolve("src/test/resources"));
-                builder.webappDir(appDir.resolve("src/main/webapp"));
-            } else {
-                // Style Eclipse
-                builder.mainJavaDir(appDir.resolve("src"));
-                builder.mainResourcesDir(appDir.resolve("conf"));
-                builder.testJavaDir(appDir.resolve("test"));
-                builder.webappDir(appDir.resolve("WebContent"));
+        if (type == ProjectType.BATCH) {
+            // Les projets batch ont une structure Maven à la racine
+            builder.mainJavaDir(projectRoot.resolve("src/main/java"));
+            builder.mainResourcesDir(projectRoot.resolve("src/main/resources"));
+            builder.testJavaDir(projectRoot.resolve("src/test/java"));
+            builder.testResourcesDir(projectRoot.resolve("src/test/resources"));
+            // Pas de webapp pour les projets batch
+            builder.webappDir(null);
+        } else {
+            Path appDir = findAppDirectory(projectRoot, type);
+            if (appDir != null) {
+                if (type == ProjectType.MAVEN_STYLE) {
+                    builder.mainJavaDir(appDir.resolve("src/main/java"));
+                    builder.mainResourcesDir(appDir.resolve("src/main/resources"));
+                    builder.testJavaDir(appDir.resolve("src/test/java"));
+                    builder.testResourcesDir(appDir.resolve("src/test/resources"));
+                    builder.webappDir(appDir.resolve("src/main/webapp"));
+                } else {
+                    // Style Eclipse
+                    builder.mainJavaDir(appDir.resolve("src"));
+                    builder.mainResourcesDir(appDir.resolve("conf"));
+                    builder.testJavaDir(appDir.resolve("test"));
+                    builder.webappDir(appDir.resolve("WebContent"));
+                }
             }
         }
 

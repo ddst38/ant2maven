@@ -23,38 +23,192 @@ public class AntBuildParser {
     private static final Logger log = LoggerFactory.getLogger(AntBuildParser.class);
 
     /**
-     * Parse tous les fichiers build.xml dans le répertoire install.
+     * Parse tous les fichiers build.xml dans les répertoires install/ et build/.
      */
     public List<AntBuildInfo> parseAll(Path projectRoot) {
         List<AntBuildInfo> builds = new ArrayList<>();
+
+        // Essayer le répertoire install/ (projets WAR/EAR classiques)
         Path installDir = projectRoot.resolve("install");
+        if (Files.exists(installDir)) {
+            // Parser le build.xml principal
+            Path mainBuild = installDir.resolve("build.xml");
+            if (Files.exists(mainBuild)) {
+                try {
+                    builds.add(parse(mainBuild, false));
+                } catch (Exception e) {
+                    log.error("Failed to parse {}: {}", mainBuild, e.getMessage());
+                }
+            }
 
-        if (!Files.exists(installDir)) {
-            log.warn("Install directory not found: {}", installDir);
-            return builds;
-        }
-
-        // Parser le build.xml principal
-        Path mainBuild = installDir.resolve("build.xml");
-        if (Files.exists(mainBuild)) {
-            try {
-                builds.add(parse(mainBuild, false));
-            } catch (Exception e) {
-                log.error("Failed to parse {}: {}", mainBuild, e.getMessage());
+            // Parser build.pic.xml s'il existe
+            Path picBuild = installDir.resolve("build.pic.xml");
+            if (Files.exists(picBuild)) {
+                try {
+                    builds.add(parse(picBuild, true));
+                } catch (Exception e) {
+                    log.error("Failed to parse {}: {}", picBuild, e.getMessage());
+                }
             }
         }
 
-        // Parser build.pic.xml s'il existe
-        Path picBuild = installDir.resolve("build.pic.xml");
-        if (Files.exists(picBuild)) {
+        // Essayer le répertoire build/ (projets batch)
+        Path buildDir = projectRoot.resolve("build");
+        if (Files.exists(buildDir.resolve("build.xml"))) {
             try {
-                builds.add(parse(picBuild, true));
+                builds.add(parseBatchBuild(buildDir.resolve("build.xml")));
             } catch (Exception e) {
-                log.error("Failed to parse {}: {}", picBuild, e.getMessage());
+                log.error("Failed to parse batch build.xml: {}", e.getMessage());
             }
+        }
+
+        if (builds.isEmpty()) {
+            log.warn("No build.xml found in install/ or build/ directories");
         }
 
         return builds;
+    }
+
+    /**
+     * Parse un build.xml de projet batch (dans le répertoire build/).
+     * Charge également build.properties et extrait la Main-Class du manifest.
+     */
+    public AntBuildInfo parseBatchBuild(Path buildFile) throws DocumentException {
+        log.info("Parsing batch build file: {}", buildFile);
+
+        SAXReader reader = new SAXReader();
+        Document document = reader.read(buildFile.toFile());
+        Element root = document.getRootElement();
+
+        // Charger build.properties depuis le même répertoire
+        Path propsFile = buildFile.getParent().resolve("build.properties");
+        Map<String, String> properties = loadBuildProperties(propsFile);
+
+        // Ajouter les properties du build.xml
+        for (Element prop : root.elements("property")) {
+            String name = prop.attributeValue("name");
+            String value = prop.attributeValue("value");
+            if (name != null && value != null) {
+                properties.putIfAbsent(name, value);
+            }
+        }
+
+        // Extraire le nom du projet
+        String projectName = root.attributeValue("name");
+
+        // Extraire la Main-Class depuis la target packageJar ou jar
+        String mainClass = extractMainClass(root);
+        if (mainClass != null) {
+            properties.put("batch.mainClass", mainClass);
+        }
+
+        // Extraire les informations du manifest
+        String specTitle = extractManifestAttribute(root, "Specification-Title");
+        if (specTitle != null) {
+            properties.put("batch.specificationTitle", specTitle);
+        }
+
+        // Marquer comme projet batch
+        properties.put("batch.project", "true");
+
+        AntBuildInfo.Builder builder = AntBuildInfo.builder()
+            .buildFile(buildFile)
+            .isPicBuild(false)
+            .projectName(projectName)
+            .properties(properties);
+
+        // Extraire app.code depuis build.properties
+        String appCode = properties.get("codeAppli");
+        if (appCode == null) {
+            appCode = properties.get("app.code");
+        }
+        builder.appCode(appCode);
+
+        // Extraire les répertoires sources
+        List<String> sourceDirs = new ArrayList<>();
+        String srcPath = properties.get("sourcePath");
+        if (srcPath != null) {
+            sourceDirs.add(srcPath);
+        }
+        builder.sourceDirs(sourceDirs);
+
+        // Extraire les répertoires de ressources
+        List<String> resourceDirs = new ArrayList<>();
+        String resPath = properties.get("resourcePath");
+        if (resPath != null) {
+            resourceDirs.add(resPath);
+        }
+        builder.resourceDirs(resourceDirs);
+
+        // Extraire les répertoires de librairies
+        List<String> libDirs = new ArrayList<>();
+        String libPath = properties.get("libPath");
+        if (libPath != null) {
+            libDirs.add(libPath);
+        }
+        builder.libDirs(libDirs);
+
+        return builder.build();
+    }
+
+    /**
+     * Charge les propriétés depuis un fichier build.properties.
+     */
+    private Map<String, String> loadBuildProperties(Path propsFile) {
+        Map<String, String> props = new LinkedHashMap<>();
+        if (Files.exists(propsFile)) {
+            try {
+                java.util.Properties p = new java.util.Properties();
+                try (var is = Files.newInputStream(propsFile)) {
+                    p.load(is);
+                }
+                p.forEach((k, v) -> props.put(k.toString(), v.toString()));
+                log.info("Loaded {} properties from {}", props.size(), propsFile.getFileName());
+            } catch (Exception e) {
+                log.warn("Failed to load build.properties: {}", e.getMessage());
+            }
+        }
+        return props;
+    }
+
+    /**
+     * Extrait la Main-Class depuis le manifest d'une target jar.
+     */
+    private String extractMainClass(Element root) {
+        for (Element target : root.elements("target")) {
+            Element jar = target.element("jar");
+            if (jar != null) {
+                Element manifest = jar.element("manifest");
+                if (manifest != null) {
+                    for (Element attr : manifest.elements("attribute")) {
+                        if ("Main-Class".equals(attr.attributeValue("name"))) {
+                            return attr.attributeValue("value");
+                        }
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Extrait un attribut du manifest.
+     */
+    private String extractManifestAttribute(Element root, String attributeName) {
+        for (Element target : root.elements("target")) {
+            Element jar = target.element("jar");
+            if (jar != null) {
+                Element manifest = jar.element("manifest");
+                if (manifest != null) {
+                    for (Element attr : manifest.elements("attribute")) {
+                        if (attributeName.equals(attr.attributeValue("name"))) {
+                            return attr.attributeValue("value");
+                        }
+                    }
+                }
+            }
+        }
+        return null;
     }
 
     /**

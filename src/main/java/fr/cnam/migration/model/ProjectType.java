@@ -21,7 +21,14 @@ public enum ProjectType {
      * Structure multi-module : plusieurs sous-projets avec chaine de dependances.
      * Ex: MetierXXXClient -> MetierXXX -> MetierXXXjms -> MetierXXXws
      */
-    MULTI_MODULE;
+    MULTI_MODULE,
+
+    /**
+     * Structure batch : src/main/java, build/build.xml, lib/dependencies/
+     * Produit un JAR executable avec Main-Class manifest et scripts de lancement.
+     * Modules typiques : PRF*_A, JK* (Spring Batch)
+     */
+    BATCH;
 
     /**
      * Retourne une description de ce type de projet.
@@ -31,6 +38,7 @@ public enum ProjectType {
             case MAVEN_STYLE -> "Structure style Maven (src/main/java)";
             case ECLIPSE_STYLE -> "Structure style Eclipse (src, WebContent)";
             case MULTI_MODULE -> "Structure multi-module (plusieurs JAR/WAR avec dependances)";
+            case BATCH -> "Structure batch (JAR executable avec scripts de lancement)";
         };
     }
 }

@@ -40,6 +40,11 @@ public class ProjectGenerator {
         Path outputDir = config.outputDir();
         log.info("Generating Maven project in: {}", outputDir);
 
+        // Detecter si c'est un projet batch
+        if (project.isBatch()) {
+            return generateBatchProject(project, analysis);
+        }
+
         // Detecter si c'est un projet multi-module
         if (project.isMultiModule()) {
             return generateMultiModule(project, analysis);
@@ -207,6 +212,358 @@ public class ProjectGenerator {
         log.info("Multi-module Maven project generation complete: {} files created", createdFiles.size());
 
         return new GenerationResult(outputDir, createdFiles, true);
+    }
+
+    /**
+     * Génère un projet Maven multi-module pour un batch (JAR exécutable).
+     * Structure:
+     * - pom.xml (parent)
+     * - {baseName}-app/ (module JAR principal)
+     * - {baseName}-dist/ (module distribution)
+     */
+    private GenerationResult generateBatchProject(ProjectStructure project, AnalysisResult analysis)
+            throws IOException {
+        Path outputDir = config.outputDir();
+        log.info("Generating batch Maven project in: {}", outputDir);
+
+        List<Path> createdFiles = new ArrayList<>();
+        String projectName = project.name().toLowerCase();
+        String baseName = projectName.replace("_a", "").replace("_j", "");
+        String appModuleName = baseName + "-app";
+        String distModuleName = baseName + "-dist";
+
+        // Créer la structure batch multi-module
+        structureCreator.createBatchMultiModuleStructure(project, outputDir, appModuleName);
+
+        // Copier les JARs non résolus vers liblocale
+        int unresolvedCopied = structureCreator.copyUnresolvedJars(analysis, outputDir);
+        if (unresolvedCopied > 0) {
+            log.info("Copié {} JARs non résolus vers liblocale", unresolvedCopied);
+        }
+
+        // Copier les JARs internes résolus vers liblocale
+        int internalCopied = structureCreator.copyInternalResolvedJars(analysis, outputDir);
+        if (internalCopied > 0) {
+            log.info("Copié {} JARs internes résolus vers liblocale", internalCopied);
+        }
+
+        // Générer le POM parent
+        List<String> modules = List.of(appModuleName, distModuleName);
+        Path parentPom = generateBatchParentPom(project, analysis, outputDir, modules, baseName);
+        createdFiles.add(parentPom);
+
+        // Générer le POM du module app
+        Path appModuleDir = outputDir.resolve(appModuleName);
+        Path appPom = generateBatchAppPom(project, analysis, appModuleDir, baseName);
+        createdFiles.add(appPom);
+
+        // Créer la structure du module dist et générer les fichiers
+        structureCreator.createDistModuleStructure(outputDir, distModuleName);
+        structureCreator.copyBatchDistributionFiles(project, outputDir, distModuleName);
+        Path distPom = generateBatchDistPom(project, outputDir.resolve(distModuleName), baseName, appModuleName);
+        createdFiles.add(distPom);
+        Path assemblyXml = generateBatchDistributionXml(project, outputDir.resolve(distModuleName), appModuleName);
+        createdFiles.add(assemblyXml);
+
+        // Installer le Maven wrapper
+        installMavenWrapper(outputDir);
+        createdFiles.add(outputDir.resolve("mvnw"));
+        createdFiles.add(outputDir.resolve("mvnw.cmd"));
+
+        log.info("Batch Maven project generation complete: {} files created", createdFiles.size());
+
+        return new GenerationResult(outputDir, createdFiles, true);
+    }
+
+    /**
+     * Génère le POM parent pour un projet batch multi-module.
+     */
+    private Path generateBatchParentPom(ProjectStructure project, AnalysisResult analysis,
+                                         Path outputDir, List<String> modules, String baseName) {
+        String projectName = project.name().toLowerCase();
+
+        Map<String, Object> model = new HashMap<>();
+        model.put("groupId", config.basePackage() + "." + baseName);
+        model.put("artifactId", projectName);
+        model.put("version", "1.0.0-SNAPSHOT");
+        model.put("projectName", project.name());
+        model.put("modules", modules);
+        model.put("packaging", "pom");
+
+        // Propriétés de version
+        Map<String, String> properties = buildVersionProperties(analysis);
+        model.put("properties", properties);
+
+        // Gestion des dépendances centralisées
+        List<Map<String, Object>> dependencyManagement = buildBatchDependencies(analysis);
+        model.put("dependencyManagement", dependencyManagement);
+
+        Path pomFile = outputDir.resolve("pom.xml");
+        templateService.renderToFile("batch-parent-pom.xml.ftl", model, pomFile);
+        return pomFile;
+    }
+
+    /**
+     * Génère le POM pour le module app d'un projet batch.
+     */
+    private Path generateBatchAppPom(ProjectStructure project, AnalysisResult analysis,
+                                      Path moduleDir, String baseName) {
+        String projectName = project.name().toLowerCase();
+        BatchConfiguration batchConfig = project.batchConfig();
+
+        Map<String, Object> model = new HashMap<>();
+        model.put("parent", Map.of(
+            "groupId", config.basePackage() + "." + baseName,
+            "artifactId", projectName,
+            "version", "1.0.0-SNAPSHOT"
+        ));
+        model.put("artifactId", baseName + "-app");
+        model.put("packaging", "jar");
+        model.put("projectName", project.name() + " Application");
+
+        // Configuration batch pour le manifest
+        if (batchConfig != null) {
+            model.put("mainClass", batchConfig.mainClass());
+            model.put("specificationTitle", batchConfig.specificationTitle());
+        }
+
+        // Dépendances (héritées du parent, donc sans version)
+        List<Map<String, String>> dependencies = buildBatchAppDependencies(analysis);
+        model.put("dependencies", dependencies);
+
+        Path pomFile = moduleDir.resolve("pom.xml");
+        templateService.renderToFile("batch-app-pom.xml.ftl", model, pomFile);
+        return pomFile;
+    }
+
+    /**
+     * Construit les dépendances pour le module app (sans versions, héritées du parent).
+     */
+    private List<Map<String, String>> buildBatchAppDependencies(AnalysisResult analysis) {
+        List<Map<String, String>> dependencies = new ArrayList<>();
+        String basePackage = config.basePackage();
+        JarPackageAnalyzer packageAnalyzer = new JarPackageAnalyzer();
+
+        // 1. Dépendances résolues
+        for (DependencyInfo dep : analysis.resolved()) {
+            Map<String, String> depMap = new LinkedHashMap<>();
+            depMap.put("groupId", dep.groupId());
+            depMap.put("artifactId", dep.artifactId());
+            // Version héritée du parent via dependencyManagement
+
+            if (dep.scope() != Scope.COMPILE) {
+                depMap.put("scope", dep.scope().getValue());
+            }
+
+            dependencies.add(depMap);
+        }
+
+        // 2. Dépendances non résolues
+        for (AnalysisResult.UnresolvedJar unresolved : analysis.unresolved()) {
+            JarInfo jar = unresolved.jar();
+            Map<String, String> depMap = new LinkedHashMap<>();
+
+            String cleanedName = fr.cnam.migration.config.JarNameCleaner.clean(jar.name());
+            String artifactName = cleanedName.replace(".jar", "");
+
+            String groupId;
+            JarPackageAnalyzer.PackageAnalysis pkgAnalysis = packageAnalyzer.analyze(jar.path());
+            if (pkgAnalysis.inferredGroupId() != null) {
+                groupId = pkgAnalysis.inferredGroupId();
+            } else {
+                groupId = basePackage;
+            }
+
+            depMap.put("groupId", groupId);
+            depMap.put("artifactId", artifactName);
+            // Version héritée du parent via dependencyManagement
+
+            dependencies.add(depMap);
+        }
+
+        return dependencies;
+    }
+
+    /**
+     * Génère le POM pour le module dist d'un projet batch.
+     */
+    private Path generateBatchDistPom(ProjectStructure project, Path moduleDir,
+                                       String baseName, String appModuleName) {
+        String projectName = project.name().toLowerCase();
+
+        Map<String, Object> model = new HashMap<>();
+        model.put("parent", Map.of(
+            "groupId", config.basePackage() + "." + baseName,
+            "artifactId", projectName,
+            "version", "1.0.0-SNAPSHOT"
+        ));
+        model.put("artifactId", baseName + "-dist");
+        model.put("appArtifactId", appModuleName);
+        model.put("projectName", project.name() + " Distribution");
+
+        Path pomFile = moduleDir.resolve("pom.xml");
+        templateService.renderToFile("batch-dist-pom.xml.ftl", model, pomFile);
+        return pomFile;
+    }
+
+    /**
+     * Génère le descripteur assembly pour le module dist d'un projet batch.
+     */
+    private Path generateBatchDistributionXml(ProjectStructure project, Path moduleDir, String appModuleName) {
+        Map<String, Object> model = new HashMap<>();
+        model.put("appArtifactId", appModuleName);
+
+        // Vérifier la présence de liblocale
+        model.put("hasLiblocale", Files.isDirectory(moduleDir.getParent().resolve("liblocale")) &&
+            !isDirectoryEmpty(moduleDir.getParent().resolve("liblocale")));
+
+        // Exclusions de configuration
+        ProjectStructure.DistributionConfig distConfig = project.distributionConfig();
+        model.put("confExclusions", distConfig != null ? distConfig.confExclusions() : List.of());
+
+        Path assemblyFile = moduleDir.resolve("src/assembly/distribution.xml");
+        templateService.renderToFile("batch-dist-assembly.xml.ftl", model, assemblyFile);
+        return assemblyFile;
+    }
+
+    /**
+     * Génère le POM pour un projet batch (ancienne méthode, gardée pour compatibilité).
+     */
+    @Deprecated
+    private Path generateBatchPom(ProjectStructure project, AnalysisResult analysis, Path outputDir) {
+        String projectName = project.name().toLowerCase();
+        String baseName = projectName.replace("_a", "").replace("_j", "");
+        BatchConfiguration batchConfig = project.batchConfig();
+
+        Map<String, Object> model = new HashMap<>();
+        model.put("groupId", config.basePackage() + "." + baseName);
+        model.put("artifactId", projectName);
+        model.put("version", "1.0.0-SNAPSHOT");
+        model.put("projectName", project.name());
+
+        // Configuration batch
+        if (batchConfig != null) {
+            model.put("mainClass", batchConfig.mainClass());
+            model.put("specificationTitle", batchConfig.specificationTitle());
+            model.put("hasPostgresProfile", batchConfig.hasPostgresProfile());
+        }
+
+        // Propriétés de version
+        Map<String, String> properties = buildVersionProperties(analysis);
+        model.put("properties", properties);
+
+        // Dépendances
+        List<Map<String, Object>> dependencies = buildBatchDependencies(analysis);
+        model.put("dependencies", dependencies);
+
+        Path pomFile = outputDir.resolve("pom.xml");
+        templateService.renderToFile("batch-pom.xml.ftl", model, pomFile);
+        return pomFile;
+    }
+
+    /**
+     * Construit la liste des dépendances pour un projet batch.
+     */
+    private List<Map<String, Object>> buildBatchDependencies(AnalysisResult analysis) {
+        List<Map<String, Object>> dependencies = new ArrayList<>();
+        String basePackage = config.basePackage();
+        JarPackageAnalyzer packageAnalyzer = new JarPackageAnalyzer();
+
+        log.info("Génération des dépendances pour le projet batch");
+        log.info("  - {} dépendances résolues", analysis.resolved().size());
+        log.info("  - {} dépendances non résolues", analysis.unresolved().size());
+
+        // 1. Dépendances résolues
+        for (DependencyInfo dep : analysis.resolved()) {
+            Map<String, Object> depMap = new LinkedHashMap<>();
+            depMap.put("groupId", dep.groupId());
+            depMap.put("artifactId", dep.artifactId());
+            depMap.put("version", dep.version());
+
+            if (dep.scope() != Scope.COMPILE) {
+                depMap.put("scope", dep.scope().getValue());
+            }
+
+            if (dep.isInternal()) {
+                depMap.put("comment", "Interne - liblocale");
+            }
+
+            // Exclusions pour dépendances transitives obsolètes
+            if ("stax-utils".equals(dep.artifactId())) {
+                depMap.put("exclusions", List.of(
+                    Map.of("groupId", "com.bea.xml", "artifactId", "jsr173-ri")
+                ));
+            }
+
+            dependencies.add(depMap);
+        }
+
+        // 2. Dépendances non résolues
+        for (AnalysisResult.UnresolvedJar unresolved : analysis.unresolved()) {
+            JarInfo jar = unresolved.jar();
+            Map<String, Object> depMap = new LinkedHashMap<>();
+
+            String cleanedName = fr.cnam.migration.config.JarNameCleaner.clean(jar.name());
+            String artifactName = cleanedName.replace(".jar", "");
+            String version = jar.sha1() != null ? "SHA-" + jar.sha1() : "UNKNOWN";
+
+            String groupId;
+            JarPackageAnalyzer.PackageAnalysis pkgAnalysis = packageAnalyzer.analyze(jar.path());
+            if (pkgAnalysis.inferredGroupId() != null) {
+                groupId = pkgAnalysis.inferredGroupId();
+            } else {
+                groupId = basePackage;
+            }
+
+            depMap.put("groupId", groupId);
+            depMap.put("artifactId", artifactName);
+            depMap.put("version", version);
+            depMap.put("comment", "Non résolu - liblocale");
+
+            dependencies.add(depMap);
+        }
+
+        log.info("Total: {} dépendances pour le projet batch", dependencies.size());
+        return dependencies;
+    }
+
+    /**
+     * Génère le descripteur assembly pour un projet batch.
+     */
+    private Path generateBatchAssemblyXml(ProjectStructure project, Path outputDir) {
+        Map<String, Object> model = new HashMap<>();
+
+        // Vérifier la présence de liblocale
+        model.put("hasLiblocale", Files.isDirectory(outputDir.resolve("liblocale")) &&
+            !isDirectoryEmpty(outputDir.resolve("liblocale")));
+
+        // Vérifier la présence de scripts
+        model.put("hasScripts", Files.isDirectory(outputDir.resolve("src/main/scripts")));
+
+        // Vérifier la présence de conf
+        model.put("hasConf", Files.isDirectory(outputDir.resolve("src/main/conf")));
+
+        // Exclusions de configuration
+        ProjectStructure.DistributionConfig distConfig = project.distributionConfig();
+        model.put("confExclusions", distConfig != null ? distConfig.confExclusions() : List.of());
+
+        Path assemblyFile = outputDir.resolve("src/assembly/distribution.xml");
+        templateService.renderToFile("batch-distribution.xml.ftl", model, assemblyFile);
+        return assemblyFile;
+    }
+
+    /**
+     * Vérifie si un répertoire est vide.
+     */
+    private boolean isDirectoryEmpty(Path dir) {
+        if (!Files.isDirectory(dir)) {
+            return true;
+        }
+        try (var stream = Files.list(dir)) {
+            return !stream.findAny().isPresent();
+        } catch (IOException e) {
+            return true;
+        }
     }
 
     /**

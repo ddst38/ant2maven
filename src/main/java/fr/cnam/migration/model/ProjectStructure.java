@@ -19,8 +19,16 @@ public record ProjectStructure(
     SourceLayout sourceLayout,
     EarConfiguration earConfig,
     DistributionConfig distributionConfig,
-    List<ModuleInfo> modules
+    List<ModuleInfo> modules,
+    BatchConfiguration batchConfig
 ) {
+
+    /**
+     * Verifie si le projet est de type batch.
+     */
+    public boolean isBatch() {
+        return type == ProjectType.BATCH;
+    }
 
     /**
      * Verifie si le projet est multi-module.
@@ -168,6 +176,7 @@ public record ProjectStructure(
         private EarConfiguration earConfig;
         private DistributionConfig distributionConfig;
         private List<ModuleInfo> modules = List.of();
+        private BatchConfiguration batchConfig;
 
         public Builder name(String name) {
             this.name = name;
@@ -229,10 +238,16 @@ public record ProjectStructure(
             return this;
         }
 
+        public Builder batchConfig(BatchConfiguration batchConfig) {
+            this.batchConfig = batchConfig;
+            return this;
+        }
+
         public ProjectStructure build() {
             return new ProjectStructure(
                 name, projectRoot, type, mainLibs, testLibs, providedLibs,
-                builds, internalDeps, sourceLayout, earConfig, distributionConfig, modules
+                builds, internalDeps, sourceLayout, earConfig, distributionConfig, modules,
+                batchConfig
             );
         }
     }
