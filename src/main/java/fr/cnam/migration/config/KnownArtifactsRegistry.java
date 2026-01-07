@@ -144,8 +144,21 @@ public class KnownArtifactsRegistry {
         // Déterminer le chemin de sauvegarde
         Path savePath = yamlFilePath;
         if (savePath == null) {
-            // Utiliser le fichier embarqué dans src/main/resources
-            savePath = Paths.get("src/main/resources/known-artifacts.yaml");
+            // Essayer src/main/resources (mode dev) sinon ~/.ant2maven/known-artifacts.yaml
+            Path devPath = Paths.get("src/main/resources/known-artifacts.yaml");
+            if (Files.exists(devPath.getParent())) {
+                savePath = devPath;
+            } else {
+                // Mode JAR: utiliser le répertoire utilisateur
+                Path userDir = Paths.get(System.getProperty("user.home"), ".ant2maven");
+                try {
+                    Files.createDirectories(userDir);
+                    savePath = userDir.resolve("known-artifacts.yaml");
+                } catch (IOException e) {
+                    log.warn("Cannot create ~/.ant2maven directory, skipping save: {}", e.getMessage());
+                    return 0;
+                }
+            }
         }
 
         try {
@@ -179,7 +192,7 @@ public class KnownArtifactsRegistry {
             return count;
 
         } catch (IOException e) {
-            log.error("Failed to save known-artifacts.yaml: {}", e.getMessage());
+            log.warn("Cannot save known-artifacts.yaml (non-blocking): {}", e.getMessage());
             return 0;
         }
     }
