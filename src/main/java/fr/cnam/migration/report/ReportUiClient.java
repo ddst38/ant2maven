@@ -10,7 +10,10 @@ import fr.cnam.migration.autofix.model.ProvidedDependency;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import fr.cnam.migration.autofix.model.MissingDependency;
+
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -30,6 +33,11 @@ public class ReportUiClient {
 
     private static final Logger log = LoggerFactory.getLogger(ReportUiClient.class);
 
+    // Préfixes de packages internes (chargés depuis internal-packages.yaml)
+    private static final List<String> INTERNAL_PACKAGE_PREFIXES = Arrays.asList(
+        "fr.cnam", "fr.cnamts", "com.cnamts", "com.cnam", "com.rfe", "biblicnam"
+    );
+
     private final String baseUrl;
     private final HttpClient httpClient;
     private final ObjectMapper objectMapper;
@@ -43,6 +51,26 @@ public class ReportUiClient {
             .build();
         this.objectMapper = new ObjectMapper()
             .registerModule(new JavaTimeModule());
+    }
+
+    /**
+     * Détermine si un groupId correspond à un package interne.
+     */
+    private boolean isInternalPackage(String groupId) {
+        if (groupId == null) return false;
+        return INTERNAL_PACKAGE_PREFIXES.stream().anyMatch(groupId::startsWith);
+    }
+
+    /**
+     * Détermine la source d'identification d'une bibliothèque.
+     */
+    private String getIdentificationSource(ResolutionMethod method) {
+        return switch (method) {
+            case ARTIFACTORY, ARTIFACTORY_CHECKSUM -> "ARTIFACTORY";
+            case CHECKSUM -> "MAVEN_CENTRAL";
+            case KNOWN_CONFIG -> "CACHE";
+            default -> null;
+        };
     }
 
     /**
@@ -94,7 +122,66 @@ public class ReportUiClient {
         request.put("migrationDate", LocalDateTime.now().toString());
         request.put("statistics", buildStatistics(project, analysis, autoFixResult));
         request.put("libraries", buildLibraries(analysis, autoFixResult));
+        request.put("detectedJars", buildDetectedJars(project));
+        request.put("missingPackages", buildMissingPackages(autoFixResult));
+        request.put("compilationSuccess", autoFixResult == null || autoFixResult.isSuccess());
         return request;
+    }
+
+    /**
+     * Construit la liste des JARs détectés dans le projet source.
+     */
+    private List<Map<String, Object>> buildDetectedJars(ProjectStructure project) {
+        List<Map<String, Object>> jars = new ArrayList<>();
+        for (JarInfo jar : project.allJars()) {
+            Map<String, Object> jarData = new LinkedHashMap<>();
+            jarData.put("name", jar.name());
+            jarData.put("size", jar.size());
+            jarData.put("source", jar.sourceEar() != null ? "Extrait de " + jar.sourceEar() : "Répertoire lib");
+            jarData.put("category", jar.category() != null ? jar.category().name() : "UNKNOWN");
+            jars.add(jarData);
+        }
+        return jars;
+    }
+
+    /**
+     * Construit la liste des packages manquants (si auto-fix a échoué).
+     */
+    private List<Map<String, Object>> buildMissingPackages(AutoFixResult autoFixResult) {
+        List<Map<String, Object>> missing = new ArrayList<>();
+        if (autoFixResult != null && autoFixResult.unresolvedErrors() != null) {
+            for (MissingDependency dep : autoFixResult.unresolvedErrors()) {
+                Map<String, Object> pkg = new LinkedHashMap<>();
+                pkg.put("type", dep.type().name());
+                pkg.put("name", dep.name());
+                pkg.put("packageName", dep.getPackage());
+                pkg.put("sourceFile", dep.sourceFile());
+                missing.add(pkg);
+            }
+        }
+        return missing;
+    }
+
+    /**
+     * Calcule le nombre de packages manquants distincts (smart detection).
+     * Regroupe les packages par leurs 3-4 premiers segments.
+     */
+    private int countDistinctMissingPackages(AutoFixResult autoFixResult) {
+        if (autoFixResult == null || autoFixResult.unresolvedErrors() == null) {
+            return 0;
+        }
+        Set<String> groups = new HashSet<>();
+        for (MissingDependency dep : autoFixResult.unresolvedErrors()) {
+            String pkg = dep.getPackage();
+            if (pkg != null) {
+                String[] segments = pkg.split("\\.");
+                // Smart detection: 4 segments si 5+, sinon 3
+                int prefixLength = segments.length >= 5 ? 4 : Math.min(3, segments.length);
+                String prefix = String.join(".", Arrays.copyOf(segments, prefixLength));
+                groups.add(prefix);
+            }
+        }
+        return groups.size();
     }
 
     /**
@@ -102,16 +189,51 @@ public class ReportUiClient {
      */
     private Map<String, Object> buildStatistics(ProjectStructure project, AnalysisResult analysis, AutoFixResult autoFixResult) {
         int totalDetected = project.allJars().size();
-        int providedCount = autoFixResult != null ? autoFixResult.addedDependencies().size() : 0;
+        int providedCount = autoFixResult != null && autoFixResult.addedDependencies() != null
+            ? autoFixResult.addedDependencies().size() : 0;
 
         // Calcul cohérent avec ReportGenerator
         int resolvedCount = (int) analysis.resolved().stream()
             .filter(d -> !d.needsLocalInstall())
             .count();
-        int unresolvedCount = (int) analysis.resolved().stream()
+
+        // Comptage des non résolus internes et externes
+        List<DependencyInfo> unresolvedDeps = analysis.resolved().stream()
             .filter(DependencyInfo::needsLocalInstall)
-            .count() + analysis.unresolved().size();
+            .collect(Collectors.toList());
+
+        int unresolvedInternal = (int) unresolvedDeps.stream()
+            .filter(d -> isInternalPackage(d.groupId()))
+            .count();
+        unresolvedInternal += (int) analysis.unresolved().stream()
+            .filter(u -> {
+                JarPackageAnalyzer analyzer = new JarPackageAnalyzer();
+                JarPackageAnalyzer.PackageAnalysis pkg = analyzer.analyze(u.jar().path());
+                return isInternalPackage(pkg.inferredGroupId());
+            })
+            .count();
+
+        int unresolvedExternal = (int) unresolvedDeps.stream()
+            .filter(d -> !isInternalPackage(d.groupId()))
+            .count();
+        unresolvedExternal += (int) analysis.unresolved().stream()
+            .filter(u -> {
+                JarPackageAnalyzer analyzer = new JarPackageAnalyzer();
+                JarPackageAnalyzer.PackageAnalysis pkg = analyzer.analyze(u.jar().path());
+                return !isInternalPackage(pkg.inferredGroupId());
+            })
+            .count();
+
+        int unresolvedCount = unresolvedInternal + unresolvedExternal;
         int totalAfterDedup = resolvedCount + unresolvedCount;
+
+        // Calcul du taux de couverture
+        int missingCount = countDistinctMissingPackages(autoFixResult);
+        int totalWithMissing = totalAfterDedup + providedCount + missingCount;
+        int coveredLibraries = resolvedCount + unresolvedCount + providedCount;
+        double coverageRate = totalWithMissing > 0 ? (coveredLibraries * 100.0 / totalWithMissing) : 100.0;
+
+        // Ancien taux de succès (pour compatibilité)
         double successRate = totalAfterDedup > 0 ? (resolvedCount * 100.0 / totalAfterDedup) : 0;
 
         // Par scope
@@ -146,7 +268,12 @@ public class ReportUiClient {
         stats.put("totalJars", totalDetected + providedCount);
         stats.put("resolved", resolvedCount + providedCount);
         stats.put("unresolved", unresolvedCount);
+        stats.put("unresolvedInternal", unresolvedInternal);
+        stats.put("unresolvedExternal", unresolvedExternal);
+        stats.put("providedAutoFix", providedCount);
+        stats.put("missingCount", missingCount);
         stats.put("successRate", Math.round(successRate * 10.0) / 10.0);
+        stats.put("coverageRate", Math.round(coverageRate * 10.0) / 10.0);
         stats.put("byScope", byScope);
         stats.put("byMethod", byMethod);
         return stats;
@@ -166,6 +293,8 @@ public class ReportUiClient {
 
             String originalName = jar != null ? jar.name() : dep.artifactId() + ".jar";
             String cleanedName = JarNameCleaner.clean(originalName);
+            boolean needsLocal = dep.needsLocalInstall();
+            boolean isInternal = isInternalPackage(dep.groupId());
 
             lib.put("originalName", originalName);
             lib.put("cleanedName", cleanedName);
@@ -176,8 +305,13 @@ public class ReportUiClient {
             lib.put("resolutionMethod", dep.method().name());
             lib.put("size", jar != null ? jar.size() : 0);
             lib.put("sha1", jar != null ? jar.sha1() : null);
-            lib.put("status", dep.needsLocalInstall() ? "LOCAL" : "RESOLVED");
-            lib.put("isInternal", dep.isInternal());
+            lib.put("status", needsLocal ? "UNRESOLVED" : "RESOLVED");
+            lib.put("isInternal", isInternal);
+            // Nouveaux champs
+            lib.put("identificationSource", getIdentificationSource(dep.method()));
+            lib.put("libraryType", isInternal ? "internal" : "external");
+            lib.put("isAutoFixProvided", false);
+            lib.put("isLocalInstall", needsLocal);
 
             libraries.add(lib);
         }
@@ -200,7 +334,7 @@ public class ReportUiClient {
             } else {
                 groupId = basePackage;
             }
-            boolean isInternal = groupId.startsWith("fr.cnam");
+            boolean isInternal = isInternalPackage(groupId);
 
             lib.put("originalName", originalName);
             lib.put("cleanedName", cleanedName);
@@ -213,6 +347,11 @@ public class ReportUiClient {
             lib.put("sha1", jar.sha1());
             lib.put("status", "UNRESOLVED");
             lib.put("isInternal", isInternal);
+            // Nouveaux champs
+            lib.put("identificationSource", null);
+            lib.put("libraryType", isInternal ? "internal" : "external");
+            lib.put("isAutoFixProvided", false);
+            lib.put("isLocalInstall", true);
 
             libraries.add(lib);
         }
@@ -228,6 +367,8 @@ public class ReportUiClient {
                     size = java.nio.file.Files.size(provided.jarPath());
                 } catch (Exception ignored) {}
 
+                boolean isInternal = isInternalPackage(provided.groupId());
+
                 lib.put("originalName", originalName);
                 lib.put("cleanedName", originalName);
                 lib.put("groupId", provided.groupId());
@@ -238,7 +379,12 @@ public class ReportUiClient {
                 lib.put("size", size);
                 lib.put("sha1", null);
                 lib.put("status", "RESOLVED");
-                lib.put("isInternal", false);
+                lib.put("isInternal", isInternal);
+                // Nouveaux champs
+                lib.put("identificationSource", null);
+                lib.put("libraryType", isInternal ? "internal" : "external");
+                lib.put("isAutoFixProvided", true);
+                lib.put("isLocalInstall", true);
 
                 libraries.add(lib);
             }

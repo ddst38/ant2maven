@@ -1,0 +1,11 @@
+# Configuration des packages internes CNAM
+# Les bibliothèques contenant ces packages sont considérées comme "internes"
+# Utilisé pour la classification dans les rapports de migration
+
+internalPackagePrefixes:
+  - fr.cnam
+  - fr.cnamts
+  - com.cnamts
+  - com.cnam
+  - com.rfe
+  - biblicnam
