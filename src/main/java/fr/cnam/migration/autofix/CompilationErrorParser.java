@@ -18,27 +18,6 @@ public class CompilationErrorParser {
 
     private static final Logger log = LoggerFactory.getLogger(CompilationErrorParser.class);
 
-    // Packages Java standard à ignorer (ne sont pas des dépendances manquantes)
-    private static final Set<String> STANDARD_PACKAGES = Set.of(
-        "java", "javax", "sun", "com.sun", "jdk", "org.w3c", "org.xml", "org.ietf"
-    );
-
-    // Classes Java standard simples à ignorer
-    private static final Set<String> STANDARD_CLASSES = Set.of(
-        "String", "Object", "Class", "Integer", "Long", "Double", "Float", "Boolean",
-        "Byte", "Short", "Character", "Void", "Number", "Math", "System", "Runtime",
-        "Thread", "Runnable", "Throwable", "Exception", "Error", "RuntimeException",
-        "File", "InputStream", "OutputStream", "Reader", "Writer", "BufferedReader",
-        "BufferedWriter", "FileReader", "FileWriter", "PrintWriter", "Scanner",
-        "List", "Set", "Map", "Collection", "Iterator", "Iterable", "Comparable",
-        "ArrayList", "HashMap", "HashSet", "LinkedList", "TreeMap", "TreeSet",
-        "Date", "Calendar", "TimeZone", "Locale", "Currency", "UUID",
-        "Pattern", "Matcher", "StringBuilder", "StringBuffer", "Arrays", "Collections",
-        "Optional", "Stream", "Collectors", "Function", "Predicate", "Consumer", "Supplier",
-        "Path", "Paths", "Files", "URI", "URL", "URLConnection",
-        "Logger", "Level", "Handler", "Formatter", "LogRecord", "LogManager"
-    );
-
     // Pattern: [ERROR] file.java:[line,col] package X does not exist
     private static final Pattern MAVEN_PACKAGE_NOT_EXIST = Pattern.compile(
         "\\[ERROR\\].*?\\] package ([\\w.]+) does not exist"
@@ -91,24 +70,6 @@ public class CompilationErrorParser {
     );
 
     /**
-     * Vérifie si un nom de classe/package est standard Java et doit être ignoré.
-     */
-    private boolean isStandardJavaClass(String name) {
-        if (name == null || name.isEmpty()) return true;
-
-        // Vérifier si c'est un package standard
-        for (String stdPkg : STANDARD_PACKAGES) {
-            if (name.startsWith(stdPkg + ".")) {
-                return true;
-            }
-        }
-
-        // Vérifier si c'est une classe simple standard (sans package)
-        String simpleName = name.contains(".") ? name.substring(name.lastIndexOf('.') + 1) : name;
-        return STANDARD_CLASSES.contains(simpleName);
-    }
-
-    /**
      * Parse la sortie de compilation et extrait les dependances manquantes.
      * Detecte les erreurs de RESOLUTION Maven (phase 1) et de COMPILATION javac (phase 2).
      */
@@ -140,30 +101,24 @@ public class CompilationErrorParser {
             Matcher mavenPackageMatcher = MAVEN_PACKAGE_NOT_EXIST.matcher(line);
             if (mavenPackageMatcher.find()) {
                 String packageName = mavenPackageMatcher.group(1);
-                if (!isStandardJavaClass(packageName)) {
-                    missing.add(new MissingDependency(Type.PACKAGE, packageName, currentSourceFile));
-                    log.debug("Package manquant detecte (Maven) : {}", packageName);
-                }
+                missing.add(new MissingDependency(Type.PACKAGE, packageName, currentSourceFile));
+                log.debug("Package manquant detecte (Maven) : {}", packageName);
             }
 
             // Pattern simple: package does not exist
             Matcher packageMatcher = PACKAGE_NOT_EXIST.matcher(line);
             if (packageMatcher.find() && !mavenPackageMatcher.find()) {
                 String packageName = packageMatcher.group(1);
-                if (!isStandardJavaClass(packageName)) {
-                    missing.add(new MissingDependency(Type.PACKAGE, packageName, currentSourceFile));
-                    log.debug("Package manquant detecte : {}", packageName);
-                }
+                missing.add(new MissingDependency(Type.PACKAGE, packageName, currentSourceFile));
+                log.debug("Package manquant detecte : {}", packageName);
             }
 
             // Pattern: cannot access
             Matcher accessMatcher = CANNOT_ACCESS.matcher(line);
             if (accessMatcher.find()) {
                 String className = accessMatcher.group(1);
-                if (!isStandardJavaClass(className)) {
-                    missing.add(new MissingDependency(Type.CLASS, className, currentSourceFile));
-                    log.debug("Classe inaccessible detectee : {}", className);
-                }
+                missing.add(new MissingDependency(Type.CLASS, className, currentSourceFile));
+                log.debug("Classe inaccessible detectee : {}", className);
             }
         }
 
@@ -176,10 +131,8 @@ public class CompilationErrorParser {
             String className = classMatcher.group(1);
             String packageName = classMatcher.group(2);
             String fullClassName = packageName + "." + className;
-            if (!isStandardJavaClass(fullClassName)) {
-                missing.add(new MissingDependency(Type.CLASS, fullClassName, currentSourceFile));
-                log.debug("Classe manquante detectee : {}", fullClassName);
-            }
+            missing.add(new MissingDependency(Type.CLASS, fullClassName, currentSourceFile));
+            log.debug("Classe manquante detectee : {}", fullClassName);
         }
 
         // Pattern: cannot find symbol - class in class (import)
@@ -187,11 +140,9 @@ public class CompilationErrorParser {
         while (classInClassMatcher.find()) {
             String className = classInClassMatcher.group(1);
             String locationClass = classInClassMatcher.group(2);
-            // On ne connait pas le package exact, on ajoute juste la classe si non standard
-            if (!isStandardJavaClass(className)) {
-                missing.add(new MissingDependency(Type.CLASS, className, currentSourceFile));
-                log.debug("Classe manquante (sans package) detectee : {}", className);
-            }
+            // On ne connait pas le package exact, on ajoute juste la classe
+            missing.add(new MissingDependency(Type.CLASS, className, currentSourceFile));
+            log.debug("Classe manquante (sans package) detectee : {}", className);
         }
 
         // Deduplication des packages a partir des classes
