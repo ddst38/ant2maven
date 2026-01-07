@@ -7,14 +7,15 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-cd "$SCRIPT_DIR"
+PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
+cd "$PROJECT_DIR"
 
-echo "Installing local JARs to Maven repository..."
+echo "Installation des JARs dans le repository Maven local du projet..."
 
 <#list internalJars as jar>
 echo "Installing ${jar.name}..."
-mvn install:install-file \
-    -Dfile="${jar.name}" \
+./mvnw -s .mvn/wrapper/settings.xml install:install-file \
+    -Dfile="liblocale/${jar.name}" \
     -DgroupId="${jar.groupId}" \
     -DartifactId="${jar.artifactId}" \
     -Dversion="${jar.version}" \
@@ -22,4 +23,4 @@ mvn install:install-file \
     -DgeneratePom=true
 
 </#list>
-echo "Done! All local JARs have been installed."
+echo "Terminé ! ${internalJars?size} JARs installés."

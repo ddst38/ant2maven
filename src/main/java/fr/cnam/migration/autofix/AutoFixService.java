@@ -257,13 +257,14 @@ public class AutoFixService {
                 }
 
                 // Ajouter la commande d'installation (meme format que le reste du script)
-                additions.append("\n# [Provided] ").append(dep.toGav()).append("\n");
+                additions.append("\necho \"Installing ").append(jarName).append("...\"\n");
                 additions.append("./mvnw -s .mvn/wrapper/settings.xml install:install-file \\\n");
                 additions.append("    -Dfile=\"liblocale/").append(jarName).append("\" \\\n");
                 additions.append("    -DgroupId=\"").append(dep.groupId()).append("\" \\\n");
                 additions.append("    -DartifactId=\"").append(dep.artifactId()).append("\" \\\n");
                 additions.append("    -Dversion=\"").append(dep.version()).append("\" \\\n");
-                additions.append("    -Dpackaging=jar\n");
+                additions.append("    -Dpackaging=jar \\\n");
+                additions.append("    -DgeneratePom=true\n");
             }
 
             if (additions.length() > 0) {
