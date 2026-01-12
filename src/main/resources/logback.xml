@@ -6,7 +6,7 @@
         </encoder>
     </appender>
 
-    <logger name="fr.cnam.migration" level="INFO"/>
+    <logger name="fr.cnam.migration" level="DEBUG"/>
 
     <root level="WARN">
         <appender-ref ref="CONSOLE"/>

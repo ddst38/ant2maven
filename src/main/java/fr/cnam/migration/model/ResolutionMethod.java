@@ -25,6 +25,16 @@ public enum ResolutionMethod {
     ARTIFACTORY("Recherche Artifactory"),
 
     /**
+     * JAR trouvé sur Nexus par checksum SHA1.
+     */
+    NEXUS_CHECKSUM("Recherche SHA1 sur Nexus"),
+
+    /**
+     * JAR existe sur Nexus (vérifié par coordonnées).
+     */
+    NEXUS("Recherche Nexus"),
+
+    /**
      * JAR trouvé sur Maven Central par checksum SHA1.
      */
     CHECKSUM("Recherche SHA1 sur Maven Central"),

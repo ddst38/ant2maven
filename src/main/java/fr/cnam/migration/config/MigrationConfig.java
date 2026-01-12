@@ -22,7 +22,16 @@ public record MigrationConfig(
     String artifactorySnapshotRepo,  // Repository pour les artefacts snapshot
     String artifactoryUsername,      // Nom d'utilisateur pour l'authentification Artifactory
     String artifactoryPassword,      // Mot de passe/token pour l'authentification Artifactory
-    DeploymentMode deploymentMode    // Déploiement LOCAL ou REMOTE
+    DeploymentMode deploymentMode,   // Déploiement LOCAL ou REMOTE
+    // Configuration Nexus
+    String nexusUrl,                 // URL de base du serveur Nexus
+    Path nexusCertPath,              // Chemin vers le fichier certificat .crt pour SSL Nexus
+    String nexusRepository,          // Repository Nexus pour les artefacts
+    String nexusUsername,            // Nom d'utilisateur pour l'authentification Nexus
+    String nexusPassword,            // Mot de passe/token pour l'authentification Nexus
+    RemoteTarget remoteTarget,       // Cible pour le mode REMOTE (ARTIFACTORY ou NEXUS)
+    // Repository de déploiement pour les librairies migrées
+    String deployRepository          // Repository pour déployer les librairies (défaut: java-dette)
 ) {
     /**
      * Package de base par défaut pour les artefacts internes.
@@ -35,8 +44,18 @@ public record MigrationConfig(
     public enum DeploymentMode {
         /** Installe les artefacts dans le repository local .m2 */
         LOCAL,
-        /** Upload les artefacts vers Artifactory */
+        /** Upload les artefacts vers Artifactory ou Nexus */
         REMOTE
+    }
+
+    /**
+     * Cible pour le mode de déploiement REMOTE.
+     */
+    public enum RemoteTarget {
+        /** Upload vers JFrog Artifactory */
+        ARTIFACTORY,
+        /** Upload vers Sonatype Nexus */
+        NEXUS
     }
 
     public static Builder builder() {
@@ -58,7 +77,32 @@ public record MigrationConfig(
      * Retourne true si le déploiement vers Artifactory est activé.
      */
     public boolean isRemoteDeployment() {
-        return deploymentMode == DeploymentMode.REMOTE && isArtifactoryConfigured();
+        return deploymentMode == DeploymentMode.REMOTE && (isArtifactoryConfigured() || isNexusConfigured());
+    }
+
+    /**
+     * Retourne true si Nexus est configuré et peut être utilisé pour les recherches.
+     */
+    public boolean isNexusConfigured() {
+        return nexusUrl != null && !nexusUrl.isBlank();
+    }
+
+    /**
+     * Retourne true si le déploiement vers Nexus est activé.
+     */
+    public boolean isNexusDeployment() {
+        return deploymentMode == DeploymentMode.REMOTE &&
+               isNexusConfigured() &&
+               remoteTarget == RemoteTarget.NEXUS;
+    }
+
+    /**
+     * Retourne true si le déploiement vers Artifactory est activé.
+     */
+    public boolean isArtifactoryDeployment() {
+        return deploymentMode == DeploymentMode.REMOTE &&
+               isArtifactoryConfigured() &&
+               (remoteTarget == RemoteTarget.ARTIFACTORY || remoteTarget == null);
     }
 
     public static class Builder {
@@ -79,6 +123,14 @@ public record MigrationConfig(
         private String artifactoryUsername;
         private String artifactoryPassword;
         private DeploymentMode deploymentMode = DeploymentMode.LOCAL;
+        // Paramètres Nexus
+        private String nexusUrl;
+        private Path nexusCertPath;
+        private String nexusRepository = "maven-releases";
+        private String nexusUsername;
+        private String nexusPassword;
+        private RemoteTarget remoteTarget;
+        private String deployRepository = "java-dette";
 
         public Builder projectRoot(Path projectRoot) {
             this.projectRoot = projectRoot;
@@ -160,6 +212,41 @@ public record MigrationConfig(
             return this;
         }
 
+        public Builder nexusUrl(String nexusUrl) {
+            this.nexusUrl = nexusUrl;
+            return this;
+        }
+
+        public Builder nexusCertPath(Path nexusCertPath) {
+            this.nexusCertPath = nexusCertPath;
+            return this;
+        }
+
+        public Builder nexusRepository(String nexusRepository) {
+            this.nexusRepository = nexusRepository;
+            return this;
+        }
+
+        public Builder nexusUsername(String nexusUsername) {
+            this.nexusUsername = nexusUsername;
+            return this;
+        }
+
+        public Builder nexusPassword(String nexusPassword) {
+            this.nexusPassword = nexusPassword;
+            return this;
+        }
+
+        public Builder remoteTarget(RemoteTarget remoteTarget) {
+            this.remoteTarget = remoteTarget;
+            return this;
+        }
+
+        public Builder deployRepository(String deployRepository) {
+            this.deployRepository = deployRepository != null ? deployRepository : "java-dette";
+            return this;
+        }
+
         public MigrationConfig build() {
             if (outputDir == null && projectRoot != null) {
                 outputDir = projectRoot.resolveSibling(projectRoot.getFileName() + "-maven");
@@ -169,7 +256,9 @@ public record MigrationConfig(
                 dryRun, buildVariant, skipMavenCentralLookup, verbose, basePackage,
                 artifactoryUrl, artifactoryCertPath, artifactoryReleaseRepo,
                 artifactorySnapshotRepo, artifactoryUsername, artifactoryPassword,
-                deploymentMode
+                deploymentMode,
+                nexusUrl, nexusCertPath, nexusRepository, nexusUsername, nexusPassword,
+                remoteTarget, deployRepository
             );
         }
     }

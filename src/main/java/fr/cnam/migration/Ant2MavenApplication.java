@@ -5,6 +5,7 @@ import fr.cnam.migration.autofix.AutoFixService;
 import fr.cnam.migration.autofix.model.AutoFixResult;
 import fr.cnam.migration.config.MigrationConfig;
 import fr.cnam.migration.config.MigrationConfig.DeploymentMode;
+import fr.cnam.migration.config.MigrationConfig.RemoteTarget;
 import fr.cnam.migration.generator.ProjectGenerator;
 import fr.cnam.migration.model.AnalysisResult;
 import fr.cnam.migration.model.ProjectStructure;
@@ -17,7 +18,9 @@ import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 
+import java.io.IOException;
 import java.nio.file.Path;
+import java.util.Map;
 import java.util.concurrent.Callable;
 
 /**
@@ -159,10 +162,57 @@ public class Ant2MavenApplication implements Callable<Integer> {
 
     @Option(
         names = {"--deploy-mode"},
-        description = "Deployment mode for unresolved artifacts: LOCAL (install to .m2) or REMOTE (upload to Artifactory)",
+        description = "Deployment mode for unresolved artifacts: LOCAL (install to .m2) or REMOTE (upload to Artifactory/Nexus)",
         defaultValue = "LOCAL"
     )
     private DeploymentMode deploymentMode;
+
+    // === Options Nexus ===
+
+    @Option(
+        names = {"--nexus-url"},
+        description = "Nexus Repository Manager URL (e.g., https://nexus.company.com)"
+    )
+    private String nexusUrl;
+
+    @Option(
+        names = {"--nexus-cert"},
+        description = "Path to SSL certificate file (.crt) for Nexus connection"
+    )
+    private Path nexusCertPath;
+
+    @Option(
+        names = {"--nexus-repo"},
+        description = "Nexus repository for artifacts",
+        defaultValue = "maven-releases"
+    )
+    private String nexusRepository;
+
+    @Option(
+        names = {"--nexus-user"},
+        description = "Nexus username for authentication"
+    )
+    private String nexusUsername;
+
+    @Option(
+        names = {"--nexus-password"},
+        description = "Nexus password/token for authentication (can also use NEXUS_PASSWORD env var)"
+    )
+    private String nexusPassword;
+
+    @Option(
+        names = {"--remote-target"},
+        description = "Target for REMOTE deployment: ARTIFACTORY or NEXUS",
+        defaultValue = "ARTIFACTORY"
+    )
+    private RemoteTarget remoteTarget;
+
+    @Option(
+        names = {"--deploy-repo"},
+        description = "Repository for deploying migrated libraries (used in settings.xml and deploy scripts)",
+        defaultValue = "java-dette"
+    )
+    private String deployRepository;
 
     @Override
     public Integer call() {
@@ -175,6 +225,12 @@ public class Ant2MavenApplication implements Callable<Integer> {
             String effectiveArtifactoryPassword = artifactoryPassword;
             if (effectiveArtifactoryPassword == null || effectiveArtifactoryPassword.isBlank()) {
                 effectiveArtifactoryPassword = System.getenv("ARTIFACTORY_PASSWORD");
+            }
+
+            // Récupérer le mot de passe Nexus depuis l'environnement si non fourni
+            String effectiveNexusPassword = nexusPassword;
+            if (effectiveNexusPassword == null || effectiveNexusPassword.isBlank()) {
+                effectiveNexusPassword = System.getenv("NEXUS_PASSWORD");
             }
 
             // Construire la configuration
@@ -196,6 +252,14 @@ public class Ant2MavenApplication implements Callable<Integer> {
                 .artifactoryUsername(artifactoryUsername)
                 .artifactoryPassword(effectiveArtifactoryPassword)
                 .deploymentMode(deploymentMode)
+                // Paramètres Nexus
+                .nexusUrl(nexusUrl)
+                .nexusCertPath(nexusCertPath)
+                .nexusRepository(nexusRepository)
+                .nexusUsername(nexusUsername)
+                .nexusPassword(effectiveNexusPassword)
+                .remoteTarget(remoteTarget)
+                .deployRepository(deployRepository)
                 .build();
 
             // Afficher la configuration
@@ -211,10 +275,29 @@ public class Ant2MavenApplication implements Callable<Integer> {
                     config.artifactoryReleaseRepo(),
                     config.artifactorySnapshotRepo());
                 if (config.artifactoryCertPath() != null) {
-                    log.info("SSL Certificate: {}", config.artifactoryCertPath());
+                    log.info("Artifactory SSL Certificate: {}", config.artifactoryCertPath());
                 }
             } else {
-                log.info("Artifactory: not configured (using Maven Central only)");
+                log.info("Artifactory: not configured");
+            }
+
+            if (config.isNexusConfigured()) {
+                log.info("Nexus: {} (repository: {})",
+                    config.nexusUrl(),
+                    config.nexusRepository());
+                if (config.nexusCertPath() != null) {
+                    log.info("Nexus SSL Certificate: {}", config.nexusCertPath());
+                }
+            } else {
+                log.info("Nexus: not configured");
+            }
+
+            if (!config.isArtifactoryConfigured() && !config.isNexusConfigured()) {
+                log.info("Using Maven Central only for resolution");
+            }
+
+            if (config.isRemoteDeployment()) {
+                log.info("Remote target: {}", config.remoteTarget());
             }
 
             // Phase 1 : Scanner la structure du projet
@@ -265,8 +348,13 @@ public class Ant2MavenApplication implements Callable<Integer> {
             reportGenerator.generateInstallScript(analysis, config.outputDir(), analyzer.getVersionExtractor());
 
             if (config.isRemoteDeployment()) {
-                reportGenerator.generateDeployScript(analysis, config.outputDir(),
-                    analyzer.getVersionExtractor(), analyzer.getArtifactoryClient());
+                if (config.isNexusDeployment()) {
+                    reportGenerator.generateNexusDeployScript(analysis, config.outputDir(),
+                        analyzer.getVersionExtractor(), analyzer.getNexusClient());
+                } else {
+                    reportGenerator.generateDeployScript(analysis, config.outputDir(),
+                        analyzer.getVersionExtractor(), analyzer.getArtifactoryClient());
+                }
             }
 
             // Résumé
@@ -281,7 +369,11 @@ public class Ant2MavenApplication implements Callable<Integer> {
             log.info("1. cd {}", result.outputDir());
 
             if (config.isRemoteDeployment()) {
-                log.info("2. ./liblocale/deploy-to-artifactory.sh  # Upload internal JARs to Artifactory");
+                if (config.isNexusDeployment()) {
+                    log.info("2. ./liblocale/deploy-to-nexus.sh       # Upload internal JARs to Nexus");
+                } else {
+                    log.info("2. ./liblocale/deploy-to-artifactory.sh  # Upload internal JARs to Artifactory");
+                }
             } else {
                 log.info("2. ./liblocale/install-local-jars.sh  # Install internal JARs locally");
             }
@@ -308,7 +400,8 @@ public class Ant2MavenApplication implements Callable<Integer> {
                 }
 
                 if (effectiveLibProvided != null) {
-                    AutoFixService autoFixService = new AutoFixService();
+                    // Passer le NexusClient pour permettre la recherche sur le repository distant
+                    AutoFixService autoFixService = new AutoFixService(analyzer.getNexusClient());
                     fixResult = autoFixService.fix(result.outputDir(), effectiveLibProvided);
                     autoFixService.printSummary(fixResult);
 
@@ -318,10 +411,28 @@ public class Ant2MavenApplication implements Callable<Integer> {
 
                     if (!fixResult.isSuccess()) {
                         log.warn("Correction automatique incomplete. Verifiez les erreurs restantes.");
+                    } else if (config.isRemoteDeployment()) {
+                        // Regénérer le script de déploiement avec les JARs provided
+                        log.info("Mise à jour du script de déploiement avec les dépendances provided...");
+                        if (config.isNexusDeployment()) {
+                            reportGenerator.generateNexusDeployScript(analysis, config.outputDir(),
+                                analyzer.getVersionExtractor(), analyzer.getNexusClient(), fixResult);
+                        } else {
+                            reportGenerator.generateDeployScript(analysis, config.outputDir(),
+                                analyzer.getVersionExtractor(), analyzer.getArtifactoryClient(), fixResult);
+                        }
+                        // Compilation réussie + mode REMOTE = exécuter le déploiement automatique
+                        executeRemoteDeployment(result.outputDir(), config);
                     }
                 } else {
                     log.warn("Repertoire lib-provided non trouve. Utilisez --lib-provided pour specifier le chemin.");
                 }
+            } else if (config.isRemoteDeployment()) {
+                // Pas d'auto-fix mais mode REMOTE = exécuter le déploiement
+                // Note: sans auto-fix, on ne sait pas si la compilation est OK
+                log.info("");
+                log.info("Mode REMOTE sans auto-fix : le script de déploiement a été généré.");
+                log.info("Exécutez-le manuellement après avoir vérifié la compilation.");
             }
 
             // Soumettre le rapport à ReportUI si configuré (après auto-fix pour inclure les provided)
@@ -344,6 +455,82 @@ public class Ant2MavenApplication implements Callable<Integer> {
                 log.error("Stack trace:", e);
             }
             return 1;
+        }
+    }
+
+    /**
+     * Exécute le script de déploiement vers Nexus ou Artifactory.
+     * Appelé uniquement si la compilation a réussi (auto-fix OK) et mode REMOTE actif.
+     */
+    private void executeRemoteDeployment(Path projectDir, MigrationConfig config) {
+        String scriptName;
+        String targetName;
+
+        if (config.isNexusDeployment()) {
+            scriptName = "deploy-to-nexus.sh";
+            targetName = "Nexus";
+        } else {
+            scriptName = "deploy-to-artifactory.sh";
+            targetName = "Artifactory";
+        }
+
+        Path scriptPath = projectDir.resolve("liblocale").resolve(scriptName).toAbsolutePath();
+
+        if (!java.nio.file.Files.exists(scriptPath)) {
+            log.warn("Script de déploiement non trouvé : {}", scriptPath);
+            return;
+        }
+
+        log.info("");
+        log.info("============================================================");
+        log.info("Déploiement automatique vers {}", targetName);
+        log.info("============================================================");
+        log.info("Exécution de : {}", scriptPath);
+
+        try {
+            // Construire la commande avec le password en paramètre si disponible
+            ProcessBuilder pb;
+            String password = null;
+
+            if (config.isNexusDeployment() && config.nexusPassword() != null) {
+                password = config.nexusPassword();
+            } else if (config.isArtifactoryDeployment() && config.artifactoryPassword() != null) {
+                password = config.artifactoryPassword();
+            }
+
+            if (password != null) {
+                pb = new ProcessBuilder("/bin/bash", scriptPath.toString(), password);
+            } else {
+                pb = new ProcessBuilder("/bin/bash", scriptPath.toString());
+            }
+
+            pb.directory(projectDir.toAbsolutePath().toFile());
+            pb.inheritIO();
+
+            // Passer aussi les variables d'environnement (au cas où)
+            Map<String, String> env = pb.environment();
+            if (config.isNexusDeployment() && config.nexusPassword() != null) {
+                env.put("NEXUS_PASSWORD", config.nexusPassword());
+            }
+            if (config.isArtifactoryDeployment() && config.artifactoryPassword() != null) {
+                env.put("ARTIFACTORY_PASSWORD", config.artifactoryPassword());
+            }
+
+            Process process = pb.start();
+            int exitCode = process.waitFor();
+
+            if (exitCode == 0) {
+                log.info("");
+                log.info("Déploiement vers {} terminé avec succès !", targetName);
+            } else {
+                log.error("Déploiement vers {} échoué (code: {})", targetName, exitCode);
+            }
+
+        } catch (IOException e) {
+            log.error("Erreur lors de l'exécution du script de déploiement : {}", e.getMessage());
+        } catch (InterruptedException e) {
+            log.error("Déploiement interrompu");
+            Thread.currentThread().interrupt();
         }
     }
 

@@ -31,6 +31,7 @@ public class DependencyAnalyzer {
     private final KnownArtifactsRegistry knownArtifacts;
     private final InternalArtifactPatterns internalPatterns;
     private final ArtifactoryClient artifactoryClient;
+    private final NexusClient nexusClient;
     private final MavenCentralClient mavenCentral;
     private final JarNamePatternMatcher patternMatcher;
     private final JarVersionExtractor versionExtractor;
@@ -41,6 +42,7 @@ public class DependencyAnalyzer {
         this.knownArtifacts = new KnownArtifactsRegistry(config.knownArtifactsFile());
         this.internalPatterns = new InternalArtifactPatterns(config.basePackage());
         this.artifactoryClient = new ArtifactoryClient(config);
+        this.nexusClient = new NexusClient(config);
         this.mavenCentral = new MavenCentralClient();
         this.patternMatcher = new JarNamePatternMatcher();
         this.versionExtractor = new JarVersionExtractor();
@@ -51,6 +53,15 @@ public class DependencyAnalyzer {
                 log.info("Artifactory connection successful: {}", config.artifactoryUrl());
             } else {
                 log.warn("Artifactory connection failed, will skip Artifactory lookups");
+            }
+        }
+
+        // Tester la connexion Nexus si configuré
+        if (config.isNexusConfigured()) {
+            if (nexusClient.testConnection()) {
+                log.info("Nexus connection successful: {}", config.nexusUrl());
+            } else {
+                log.warn("Nexus connection failed, will skip Nexus lookups");
             }
         }
     }
@@ -93,6 +104,9 @@ public class DependencyAnalyzer {
 
         if (config.isArtifactoryConfigured()) {
             log.info("Artifactory cache stats: {}", artifactoryClient.getCacheStats());
+        }
+        if (config.isNexusConfigured()) {
+            log.info("Nexus cache stats: {}", nexusClient.getCacheStats());
         }
         log.info("Maven Central cache stats: {}", mavenCentral.getCacheStats());
 
@@ -148,6 +162,22 @@ public class DependencyAnalyzer {
                 ResolutionMethod.ARTIFACTORY_CHECKSUM, "Not found on Artifactory"));
         }
 
+        // Stratégie 2b : Recherche Nexus par SHA1
+        if (config.isNexusConfigured() && jar.sha1() != null) {
+            Optional<MavenCoordinate> fromNexus = nexusClient.searchBySha1(jar.sha1());
+            if (fromNexus.isPresent()) {
+                MavenCoordinate coord = fromNexus.get();
+                attempts.add(AnalysisResult.ResolutionAttempt.success(
+                    ResolutionMethod.NEXUS_CHECKSUM, coord));
+                log.debug("Resolved from Nexus by SHA1: {} -> {}", jar.name(), coord.toGav());
+                // Enregistrer dans known-artifacts.yaml pour les prochaines exécutions
+                knownArtifacts.addEntry(jar.sha1(), coord, jar.originalName());
+                return ResolutionContext.resolved(coord, ResolutionMethod.NEXUS_CHECKSUM, attempts);
+            }
+            attempts.add(AnalysisResult.ResolutionAttempt.failed(
+                ResolutionMethod.NEXUS_CHECKSUM, "Not found on Nexus"));
+        }
+
         // Stratégie 3 : Recherche Maven Central par SHA1
         if (!config.skipMavenCentralLookup() && jar.sha1() != null) {
             Optional<MavenCoordinate> bySha1 = mavenCentral.searchBySha1(jar.sha1());
@@ -188,6 +218,18 @@ public class DependencyAnalyzer {
                     knownArtifacts.addEntry(jar.sha1(), coord, jar.originalName());
                 }
                 return ResolutionContext.resolved(coord, ResolutionMethod.ARTIFACTORY, attempts);
+            }
+
+            // Ensuite vérifier sur Nexus
+            if (config.isNexusConfigured() && nexusClient.exists(coord)) {
+                attempts.add(AnalysisResult.ResolutionAttempt.success(
+                    ResolutionMethod.NEXUS, coord));
+                log.debug("Resolved by pattern, verified on Nexus: {} -> {}", jar.name(), coord.toGav());
+                // Enregistrer dans known-artifacts.yaml
+                if (jar.sha1() != null) {
+                    knownArtifacts.addEntry(jar.sha1(), coord, jar.originalName());
+                }
+                return ResolutionContext.resolved(coord, ResolutionMethod.NEXUS, attempts);
             }
 
             // Ensuite vérifier sur Maven Central
@@ -287,6 +329,13 @@ public class DependencyAnalyzer {
      */
     public ArtifactoryClient getArtifactoryClient() {
         return artifactoryClient;
+    }
+
+    /**
+     * Retourne le client Nexus pour utilisation par d'autres composants.
+     */
+    public NexusClient getNexusClient() {
+        return nexusClient;
     }
 
     /**

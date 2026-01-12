@@ -21,12 +21,14 @@ Projet ANT → [Scanner] → [Analyzer] → [Generator] → Projet Maven
 ### Phase 2: Analyzer
 **Classe:** `analyzer/DependencyAnalyzer.java`
 
-Pipeline de résolution (5 stratégies en ordre):
+Pipeline de résolution (7 stratégies en ordre):
 1. `KnownArtifactsRegistry` → known-artifacts.yaml
-2. `InternalArtifactPatterns` → DEPFAB.*, jk-socle-*
-3. `ArtifactoryClient` → Recherche SHA1
+2. `ArtifactoryClient` → Recherche SHA1 (si configuré)
+3. `NexusClient` → Recherche SHA1 (si configuré)
 4. `MavenCentralClient` → Recherche SHA1
-5. `JarNamePatternMatcher` → Regex sur nom fichier
+5. `InternalArtifactPatterns` → DEPFAB.*, jk-socle-*
+6. `JarNamePatternMatcher` → Pattern sur nom fichier avec vérification Artifactory/Nexus/Central
+7. Fallback → Coordonnées avec version SHA
 
 **Déduplication:** Par SHA1, priorité MAIN > PROVIDED > TEST
 
@@ -72,7 +74,18 @@ java -jar target/ant2maven-1.0-SNAPSHOT.jar \
 | `-o, --output` | Répertoire sortie Maven |
 | `--profile` | Profil (default/pic) |
 | `--artifactory-url` | URL Artifactory (optionnel) |
+| `--artifactory-cert` | Certificat SSL Artifactory |
+| `--artifactory-release-repo` | Repository releases (défaut: libs-release-local) |
+| `--artifactory-snapshot-repo` | Repository snapshots (défaut: libs-snapshot-local) |
+| `--artifactory-user` | Utilisateur Artifactory |
+| `--artifactory-password` | Mot de passe (ou env ARTIFACTORY_PASSWORD) |
+| `--nexus-url` | URL Nexus (optionnel) |
+| `--nexus-cert` | Certificat SSL Nexus |
+| `--nexus-repo` | Repository Nexus (défaut: maven-releases) |
+| `--nexus-user` | Utilisateur Nexus |
+| `--nexus-password` | Mot de passe (ou env NEXUS_PASSWORD) |
 | `--deploy-mode` | LOCAL ou REMOTE |
+| `--remote-target` | Cible REMOTE: ARTIFACTORY ou NEXUS |
 | `--auto-fix` | Compile et ajoute automatiquement les dépendances provided manquantes |
 | `--lib-provided` | Répertoire des librairies provided (défaut: lib-provided) |
 
@@ -111,5 +124,14 @@ lib-provided/
 
 - `migration-report.html` - Rapport détaillé
 - `libnotfound.csv` - JARs non résolus
-- `install-local-jars.sh` - Script installation locale
-- `deploy-to-artifactory.sh` - Script déploiement Artifactory
+- `install-local-jars.sh` - Script installation locale (mode LOCAL)
+- `deploy-to-artifactory.sh` - Script déploiement Artifactory (mode REMOTE + target ARTIFACTORY)
+- `deploy-to-nexus.sh` - Script déploiement Nexus (mode REMOTE + target NEXUS)
+
+## Clients Repository
+
+| Classe | Gestionnaire | API |
+|--------|--------------|-----|
+| `ArtifactoryClient.java` | JFrog Artifactory | `/api/search/checksum?sha1=...` |
+| `NexusClient.java` | Sonatype Nexus | `/service/rest/v1/search/assets?sha1=...` |
+| `MavenCentralClient.java` | Maven Central | API search.maven.org |

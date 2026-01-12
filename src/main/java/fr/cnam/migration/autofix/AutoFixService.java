@@ -1,7 +1,9 @@
 package fr.cnam.migration.autofix;
 
+import fr.cnam.migration.analyzer.NexusClient;
 import fr.cnam.migration.autofix.model.*;
 import fr.cnam.migration.autofix.model.MissingDependency.Type;
+import fr.cnam.migration.model.MavenCoordinate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -14,6 +16,10 @@ import java.util.stream.Stream;
 /**
  * Service principal de correction automatique des erreurs de compilation.
  * Orchestre l'indexation, la compilation, le parsing des erreurs et l'injection des dependances.
+ *
+ * Ordre de recherche des dépendances manquantes :
+ * 1. Nexus (si configuré) - recherche par package/groupId
+ * 2. lib-provided - recherche dans l'index local
  */
 public class AutoFixService {
 
@@ -26,12 +32,23 @@ public class AutoFixService {
     private final CompilationRunner runner;
     private final CompilationErrorParser parser;
     private final PomDependencyInjector injector;
+    private final NexusClient nexusClient;
 
     public AutoFixService() {
+        this(null);
+    }
+
+    /**
+     * Constructeur avec client Nexus pour rechercher les dépendances sur le repository distant.
+     *
+     * @param nexusClient Client Nexus (peut être null si Nexus non configuré)
+     */
+    public AutoFixService(NexusClient nexusClient) {
         this.indexer = new LibProvidedIndexer();
         this.runner = new CompilationRunner();
         this.parser = new CompilationErrorParser();
         this.injector = new PomDependencyInjector();
+        this.nexusClient = nexusClient;
     }
 
     /**
@@ -109,11 +126,39 @@ public class AutoFixService {
 
             log.info("{} dependance(s) manquante(s) detectee(s)", errors.size());
 
-            // Etape 4: Matcher avec lib-provided
-            log.info("Phase 4: Recherche dans lib-provided...");
+            // Etape 4a: Recherche sur Nexus (si configuré)
+            List<MavenCoordinate> nexusDeps = new ArrayList<>();
+            Set<MissingDependency> remainingErrors = new HashSet<>(errors);
+
+            if (nexusClient != null) {
+                log.info("Phase 4a: Recherche sur Nexus...");
+                for (MissingDependency error : errors) {
+                    String packageName = error.type() == Type.CLASS ? error.getPackage() : error.name();
+                    Optional<MavenCoordinate> fromNexus = nexusClient.searchByPackage(packageName);
+
+                    if (fromNexus.isPresent()) {
+                        MavenCoordinate coord = fromNexus.get();
+                        String gav = coord.toGav();
+
+                        if (!alreadyAddedGavs.contains(gav)) {
+                            nexusDeps.add(coord);
+                            alreadyAddedGavs.add(gav);
+                            remainingErrors.remove(error);
+                            log.info("  Nexus: {} -> {}", error.name(), gav);
+                        }
+                    }
+                }
+
+                if (!nexusDeps.isEmpty()) {
+                    log.info("{} dependance(s) trouvee(s) sur Nexus", nexusDeps.size());
+                }
+            }
+
+            // Etape 4b: Recherche dans lib-provided pour les erreurs restantes
+            log.info("Phase 4b: Recherche dans lib-provided...");
             List<ProvidedDependency> toAdd = new ArrayList<>();
 
-            for (MissingDependency error : errors) {
+            for (MissingDependency error : remainingErrors) {
                 Optional<Path> jarPath = findMatchingJar(error);
                 if (jarPath.isPresent()) {
                     ProvidedDependency dep = indexer.createDependency(jarPath.get());
@@ -122,45 +167,54 @@ public class AutoFixService {
                     if (!alreadyAddedGavs.contains(dep.toGav())) {
                         toAdd.add(dep);
                         alreadyAddedGavs.add(dep.toGav());
-                        log.info("  Match: {} -> {}", error.name(), dep.toGav());
+                        log.info("  lib-provided: {} -> {}", error.name(), dep.toGav());
                     }
                 } else {
                     log.debug("  Pas de match pour : {}", error.name());
                 }
             }
 
-            if (toAdd.isEmpty()) {
-                log.warn("Aucune nouvelle dependance trouvee dans lib-provided.");
+            if (nexusDeps.isEmpty() && toAdd.isEmpty()) {
+                log.warn("Aucune nouvelle dependance trouvee (Nexus ni lib-provided).");
                 log.warn("Les erreurs restantes necessitent une intervention manuelle.");
                 lastErrors = errors;
                 return AutoFixResult.failure(iteration, allAdded, errors);
             }
 
-            // Etape 5: Copier les JARs vers liblocale et injecter les dependances
-            log.info("Phase 5: Copie des JARs et injection des dependances...");
+            // Etape 5: Injection des dependances
+            log.info("Phase 5: Injection des dependances...");
+            Path targetPom = findTargetPom(projectDir);
 
-            // Copier les JARs de lib-provided vers liblocale
-            Path liblocale = projectDir.resolve("liblocale");
-            Files.createDirectories(liblocale);
-            for (ProvidedDependency dep : toAdd) {
-                Path target = liblocale.resolve(dep.jarPath().getFileName());
-                if (!Files.exists(target)) {
-                    Files.copy(dep.jarPath(), target);
-                    log.info("  Copie: {} -> liblocale/", dep.jarPath().getFileName());
-                }
+            // 5a: Ajouter les dépendances Nexus (scope compile, pas de copie locale)
+            if (!nexusDeps.isEmpty()) {
+                int addedNexus = injector.addMavenDependencies(targetPom, nexusDeps);
+                log.info("{} dependance(s) Nexus ajoutee(s) (scope compile)", addedNexus);
             }
 
-            // Injecter dans le pom.xml
-            Path targetPom = findTargetPom(projectDir);
-            int added = injector.addProvidedDependencies(targetPom, toAdd);
+            // 5b: Copier les JARs lib-provided vers liblocale et les ajouter (scope provided)
+            if (!toAdd.isEmpty()) {
+                Path liblocale = projectDir.resolve("liblocale");
+                Files.createDirectories(liblocale);
+                for (ProvidedDependency dep : toAdd) {
+                    Path target = liblocale.resolve(dep.jarPath().getFileName());
+                    if (!Files.exists(target)) {
+                        Files.copy(dep.jarPath(), target);
+                        log.info("  Copie: {} -> liblocale/", dep.jarPath().getFileName());
+                    }
+                }
 
-            // Mettre a jour le script d'installation
-            updateInstallScript(projectDir, toAdd);
+                int addedProvided = injector.addProvidedDependencies(targetPom, toAdd);
+
+                // Mettre a jour le script d'installation
+                updateInstallScript(projectDir, toAdd);
+
+                log.info("{} dependance(s) provided ajoutee(s)", addedProvided);
+            }
 
             allAdded.addAll(toAdd);
             lastErrors = errors;
 
-            log.info("{} dependance(s) ajoutee(s) a {}", added, targetPom.getFileName());
+            log.info("Total: {} dependance(s) ajoutee(s) a {}", nexusDeps.size() + toAdd.size(), targetPom.getFileName());
 
             // Reinstaller les JARs locaux pour inclure les nouveaux
             log.info("Reinstallation des JARs locaux...");

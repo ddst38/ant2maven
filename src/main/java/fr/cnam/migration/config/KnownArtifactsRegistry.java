@@ -112,6 +112,10 @@ public class KnownArtifactsRegistry {
      * Ajoute une nouvelle entrée au registre.
      * L'entrée sera sauvegardée lors de l'appel à saveNewEntries().
      *
+     * Les JARs avec une version commençant par "SHA-" ou égale à "LOCAL" ne sont pas
+     * mis en cache, car ils doivent être re-vérifiés sur les repositories distants
+     * (Nexus, Artifactory) à chaque exécution pour détecter s'ils y ont été déployés.
+     *
      * @param sha1 Le checksum SHA1 du JAR
      * @param coord Les coordonnées Maven résolues
      * @param jarName Le nom original du fichier JAR (pour documentation)
@@ -120,6 +124,16 @@ public class KnownArtifactsRegistry {
         if (sha1 == null || coord == null) {
             return;
         }
+
+        // Ne pas cacher les JARs avec version SHA-xxx ou LOCAL
+        // Ces JARs doivent être re-vérifiés sur Nexus/Artifactory à chaque exécution
+        String version = coord.version();
+        if (version != null && (version.startsWith("SHA-") || version.equals("LOCAL") || version.equals("UNKNOWN"))) {
+            log.debug("Skipping cache for {} - version {} requires re-verification on remote repositories",
+                jarName, version);
+            return;
+        }
+
         String sha1Lower = sha1.toLowerCase();
 
         // Ne pas ajouter si déjà présent

@@ -1,6 +1,7 @@
 package fr.cnam.migration.report;
 
 import fr.cnam.migration.analyzer.ArtifactoryClient;
+import fr.cnam.migration.analyzer.NexusClient;
 import fr.cnam.migration.analyzer.JarPackageAnalyzer;
 import fr.cnam.migration.analyzer.JarVersionExtractor;
 import fr.cnam.migration.config.InternalArtifactPatterns;
@@ -253,22 +254,32 @@ public class ReportGenerator {
     public void generateDeployScript(AnalysisResult analysis, Path outputDir,
                                      JarVersionExtractor versionExtractor,
                                      ArtifactoryClient artifactoryClient) throws IOException {
+        generateDeployScript(analysis, outputDir, versionExtractor, artifactoryClient, null);
+    }
+
+    /**
+     * Génère le script deploy-to-artifactory.sh avec support des JARs provided (auto-fix).
+     */
+    public void generateDeployScript(AnalysisResult analysis, Path outputDir,
+                                     JarVersionExtractor versionExtractor,
+                                     ArtifactoryClient artifactoryClient,
+                                     AutoFixResult autoFixResult) throws IOException {
         if (config == null || !config.isArtifactoryConfigured()) {
             log.warn("Artifactory non configuré, génération du script de déploiement ignorée");
             return;
         }
 
+        // Repository de déploiement (configurable via --deploy-repo)
+        final String DEPLOY_REPO = config.deployRepository();
+
         List<Map<String, String>> deployableJars = new ArrayList<>();
         String basePackage = config.basePackage();
 
-        // 1. Collecter les dépendances internes résolues
-        // Utiliser les MÊMES coordonnées que dans le pom.xml
-        for (DependencyInfo dep : analysis.internalDependencies()) {
+        // 1. Collecter les dépendances nécessitant une installation locale
+        // (uniquement celles qui ne sont pas déjà présentes sur un repo distant)
+        for (DependencyInfo dep : analysis.localDependencies()) {
             JarInfo jar = dep.sourceJar();
-
-            // Nettoyer le nom du fichier (supprimer DEPFAB. et code projet)
             String cleanedFileName = JarNameCleaner.clean(jar.name());
-
             MavenCoordinate coord = dep.coordinate();
 
             deployableJars.add(Map.of(
@@ -279,25 +290,19 @@ public class ReportGenerator {
                 "artifactId", coord.artifactId(),
                 "version", coord.version(),
                 "versionSource", dep.method().getDescription(),
-                "isInternal", "true",
-                "deployCommand", artifactoryClient.generateDeployCommand(jar.path(), coord, false)
+                "type", dep.isInternal() ? "Interne" : "Externe",
+                "deployCommand", artifactoryClient.generateDeployCommand(jar.path(), coord, DEPLOY_REPO)
             ));
         }
 
         // 2. Collecter les JARs non résolus
-        // Utiliser les MÊMES coordonnées que dans le pom.xml avec SHA comme version
-        // Analyse le package réel du JAR pour déterminer le groupId correct
         JarPackageAnalyzer deployPackageAnalyzer = new JarPackageAnalyzer();
         for (AnalysisResult.UnresolvedJar unresolved : analysis.unresolved()) {
             JarInfo jar = unresolved.jar();
-
-            // Nettoyer le nom du fichier (supprimer DEPFAB. et code projet)
             String cleanedFileName = JarNameCleaner.clean(jar.name());
             String artifactName = cleanedFileName.replace(".jar", "");
-            // Utiliser le SHA1 comme version pour garantir l'unicité
             String version = jar.sha1() != null ? "SHA-" + jar.sha1() : "UNKNOWN";
 
-            // Analyser le package réel du JAR pour déterminer le groupId
             String groupId;
             JarPackageAnalyzer.PackageAnalysis pkgAnalysis = deployPackageAnalyzer.analyze(jar.path());
             if (pkgAnalysis.inferredGroupId() != null) {
@@ -305,13 +310,8 @@ public class ReportGenerator {
             } else {
                 groupId = basePackage;
             }
-            boolean isInternal = groupId.startsWith("fr.cnam");
 
-            MavenCoordinate coord = new MavenCoordinate(
-                groupId,
-                artifactName,
-                version
-            );
+            MavenCoordinate coord = new MavenCoordinate(groupId, artifactName, version);
 
             deployableJars.add(Map.of(
                 "originalName", jar.name(),
@@ -321,9 +321,29 @@ public class ReportGenerator {
                 "artifactId", coord.artifactId(),
                 "version", coord.version(),
                 "versionSource", "Non résolu - version basée sur SHA",
-                "isInternal", String.valueOf(isInternal),
-                "deployCommand", artifactoryClient.generateDeployCommand(jar.path(), coord, false)
+                "type", "Non résolu",
+                "deployCommand", artifactoryClient.generateDeployCommand(jar.path(), coord, DEPLOY_REPO)
             ));
+        }
+
+        // 3. Collecter les JARs provided (auto-fix)
+        if (autoFixResult != null && autoFixResult.addedDependencies() != null) {
+            for (ProvidedDependency provided : autoFixResult.addedDependencies()) {
+                MavenCoordinate coord = new MavenCoordinate(
+                    provided.groupId(), provided.artifactId(), provided.version());
+
+                deployableJars.add(Map.of(
+                    "originalName", provided.jarPath().getFileName().toString(),
+                    "fileName", provided.jarPath().getFileName().toString(),
+                    "path", provided.jarPath().toAbsolutePath().toString(),
+                    "groupId", coord.groupId(),
+                    "artifactId", coord.artifactId(),
+                    "version", coord.version(),
+                    "versionSource", "Auto-fix (provided)",
+                    "type", "Provided",
+                    "deployCommand", artifactoryClient.generateDeployCommand(provided.jarPath(), coord, DEPLOY_REPO)
+                ));
+            }
         }
 
         // Générer le script de déploiement
@@ -337,30 +357,37 @@ public class ReportGenerator {
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))).append("\n");
         script.append("#\n");
         script.append("# Artifactory: ").append(config.artifactoryUrl()).append("\n");
-        script.append("# Repository Release: ").append(config.artifactoryReleaseRepo()).append("\n");
+        script.append("# Repository: ").append(DEPLOY_REPO).append("\n");
         script.append("#\n");
         script.append("# Les coordonnées Maven correspondent EXACTEMENT à celles du pom.xml.\n");
         script.append("#\n");
         script.append("# Note: Les préfixes DEPFAB. et codes projet ont été supprimés des noms de fichiers.\n");
         script.append("#\n");
-        script.append("# IMPORTANT: Définir la variable d'environnement ARTIFACTORY_PASSWORD avant exécution.\n");
+        script.append("# IMPORTANT: Le mot de passe peut être passé via:\n");
+        script.append("#   - Variable d'environnement ARTIFACTORY_PASSWORD\n");
+        script.append("#   - Paramètre du script: ./deploy-to-artifactory.sh mon_password\n");
         script.append("\n");
         script.append("set -e\n");
         script.append("cd \"$(dirname \"$0\")\"\n");
         script.append("\n");
+        script.append("# Récupérer le password: paramètre > variable d'environnement\n");
+        script.append("if [ -n \"$1\" ]; then\n");
+        script.append("    ARTIFACTORY_PASSWORD=\"$1\"\n");
+        script.append("fi\n");
+        script.append("\n");
         script.append("if [ -z \"$ARTIFACTORY_PASSWORD\" ]; then\n");
-        script.append("    echo \"ERREUR: La variable d'environnement ARTIFACTORY_PASSWORD n'est pas définie.\"\n");
-        script.append("    echo \"Définissez-la avec: export ARTIFACTORY_PASSWORD=votre_mot_de_passe\"\n");
+        script.append("    echo \"ERREUR: Mot de passe Artifactory non défini.\"\n");
+        script.append("    echo \"Utilisez: export ARTIFACTORY_PASSWORD=xxx ou ./deploy-to-artifactory.sh xxx\"\n");
         script.append("    exit 1\n");
         script.append("fi\n");
         script.append("\n");
         script.append("echo \"Déploiement des JARs vers Artifactory...\"\n");
         script.append("echo \"Cible: ").append(config.artifactoryUrl()).append("/")
-               .append(config.artifactoryReleaseRepo()).append("\"\n");
+               .append(DEPLOY_REPO).append("\"\n");
         script.append("\n");
 
         for (Map<String, String> jar : deployableJars) {
-            String typeMarker = "true".equals(jar.get("isInternal")) ? "[Interne]" : "[Non résolu]";
+            String typeMarker = "[" + jar.get("type") + "]";
             String originalName = jar.get("originalName");
             String fileName = jar.get("fileName");
 
@@ -385,6 +412,179 @@ public class ReportGenerator {
         scriptFile.toFile().setExecutable(true);
 
         log.info("Script deploy-to-artifactory.sh généré pour {} JARs", deployableJars.size());
+    }
+
+    /**
+     * Génère le script deploy-to-nexus.sh pour le mode de déploiement REMOTE vers Nexus.
+     *
+     * IMPORTANT: Les coordonnées Maven utilisées dans ce script DOIVENT correspondre
+     * exactement à celles déclarées dans le pom.xml du module WAR.
+     *
+     * Les noms de fichiers sont nettoyés (suppression de DEPFAB. et codes projet)
+     * pour correspondre aux fichiers copiés dans liblocale.
+     */
+    public void generateNexusDeployScript(AnalysisResult analysis, Path outputDir,
+                                          JarVersionExtractor versionExtractor,
+                                          NexusClient nexusClient) throws IOException {
+        generateNexusDeployScript(analysis, outputDir, versionExtractor, nexusClient, null);
+    }
+
+    /**
+     * Génère le script deploy-to-nexus.sh avec support des JARs provided (auto-fix).
+     */
+    public void generateNexusDeployScript(AnalysisResult analysis, Path outputDir,
+                                          JarVersionExtractor versionExtractor,
+                                          NexusClient nexusClient,
+                                          AutoFixResult autoFixResult) throws IOException {
+        if (config == null || !config.isNexusConfigured()) {
+            log.warn("Nexus non configuré, génération du script de déploiement ignorée");
+            return;
+        }
+
+        // Repository de déploiement (configurable via --deploy-repo)
+        final String DEPLOY_REPO = config.deployRepository();
+
+        List<Map<String, String>> deployableJars = new ArrayList<>();
+        String basePackage = config.basePackage();
+
+        // 1. Collecter les dépendances nécessitant une installation locale
+        // (uniquement celles qui ne sont pas déjà présentes sur un repo distant)
+        for (DependencyInfo dep : analysis.localDependencies()) {
+            JarInfo jar = dep.sourceJar();
+
+            String cleanedFileName = JarNameCleaner.clean(jar.name());
+            MavenCoordinate coord = dep.coordinate();
+
+            deployableJars.add(Map.of(
+                "originalName", jar.name(),
+                "fileName", cleanedFileName,
+                "path", jar.path().toAbsolutePath().toString(),
+                "groupId", coord.groupId(),
+                "artifactId", coord.artifactId(),
+                "version", coord.version(),
+                "versionSource", dep.method().getDescription(),
+                "type", dep.isInternal() ? "Interne" : "Externe",
+                "deployCommand", nexusClient.generateDeployCommand(jar.path(), coord, false, DEPLOY_REPO)
+            ));
+        }
+
+        // 2. Collecter les JARs non résolus
+        JarPackageAnalyzer deployPackageAnalyzer = new JarPackageAnalyzer();
+        for (AnalysisResult.UnresolvedJar unresolved : analysis.unresolved()) {
+            JarInfo jar = unresolved.jar();
+
+            String cleanedFileName = JarNameCleaner.clean(jar.name());
+            String artifactName = cleanedFileName.replace(".jar", "");
+            String version = jar.sha1() != null ? "SHA-" + jar.sha1() : "UNKNOWN";
+
+            String groupId;
+            JarPackageAnalyzer.PackageAnalysis pkgAnalysis = deployPackageAnalyzer.analyze(jar.path());
+            if (pkgAnalysis.inferredGroupId() != null) {
+                groupId = pkgAnalysis.inferredGroupId();
+            } else {
+                groupId = basePackage;
+            }
+
+            MavenCoordinate coord = new MavenCoordinate(groupId, artifactName, version);
+
+            deployableJars.add(Map.of(
+                "originalName", jar.name(),
+                "fileName", cleanedFileName,
+                "path", jar.path().toAbsolutePath().toString(),
+                "groupId", coord.groupId(),
+                "artifactId", coord.artifactId(),
+                "version", coord.version(),
+                "versionSource", "Non résolu - version basée sur SHA",
+                "type", "Non résolu",
+                "deployCommand", nexusClient.generateDeployCommand(jar.path(), coord, false, DEPLOY_REPO)
+            ));
+        }
+
+        // 3. Collecter les JARs provided (auto-fix)
+        if (autoFixResult != null && autoFixResult.addedDependencies() != null) {
+            for (ProvidedDependency provided : autoFixResult.addedDependencies()) {
+                MavenCoordinate coord = new MavenCoordinate(
+                    provided.groupId(), provided.artifactId(), provided.version());
+
+                deployableJars.add(Map.of(
+                    "originalName", provided.jarPath().getFileName().toString(),
+                    "fileName", provided.jarPath().getFileName().toString(),
+                    "path", provided.jarPath().toAbsolutePath().toString(),
+                    "groupId", coord.groupId(),
+                    "artifactId", coord.artifactId(),
+                    "version", coord.version(),
+                    "versionSource", "Auto-fix (provided)",
+                    "type", "Provided",
+                    "deployCommand", nexusClient.generateDeployCommand(provided.jarPath(), coord, false, DEPLOY_REPO)
+                ));
+            }
+        }
+
+        // Générer le script de déploiement
+        Path scriptDir = outputDir.resolve("liblocale");
+        Files.createDirectories(scriptDir);
+
+        StringBuilder script = new StringBuilder();
+        script.append("#!/bin/bash\n");
+        script.append("# Déploiement des JARs vers Nexus\n");
+        script.append("# Généré par ant2maven le ").append(LocalDateTime.now().format(
+            DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))).append("\n");
+        script.append("#\n");
+        script.append("# Nexus: ").append(config.nexusUrl()).append("\n");
+        script.append("# Repository: ").append(DEPLOY_REPO).append("\n");
+        script.append("#\n");
+        script.append("# Les coordonnées Maven correspondent EXACTEMENT à celles du pom.xml.\n");
+        script.append("#\n");
+        script.append("# Note: Les préfixes DEPFAB. et codes projet ont été supprimés des noms de fichiers.\n");
+        script.append("#\n");
+        script.append("# IMPORTANT: Le mot de passe peut être passé via:\n");
+        script.append("#   - Variable d'environnement NEXUS_PASSWORD\n");
+        script.append("#   - Paramètre du script: ./deploy-to-nexus.sh mon_password\n");
+        script.append("\n");
+        script.append("set -e\n");
+        script.append("cd \"$(dirname \"$0\")\"\n");
+        script.append("\n");
+        script.append("# Récupérer le password: paramètre > variable d'environnement\n");
+        script.append("if [ -n \"$1\" ]; then\n");
+        script.append("    NEXUS_PASSWORD=\"$1\"\n");
+        script.append("fi\n");
+        script.append("\n");
+        script.append("if [ -z \"$NEXUS_PASSWORD\" ]; then\n");
+        script.append("    echo \"ERREUR: Mot de passe Nexus non défini.\"\n");
+        script.append("    echo \"Utilisez: export NEXUS_PASSWORD=xxx ou ./deploy-to-nexus.sh xxx\"\n");
+        script.append("    exit 1\n");
+        script.append("fi\n");
+        script.append("\n");
+        script.append("echo \"Déploiement des JARs vers Nexus...\"\n");
+        script.append("echo \"Cible: ").append(config.nexusUrl()).append("/repository/")
+               .append(DEPLOY_REPO).append("\"\n");
+        script.append("\n");
+
+        for (Map<String, String> jar : deployableJars) {
+            String typeMarker = "[" + jar.get("type") + "]";
+            String originalName = jar.get("originalName");
+            String fileName = jar.get("fileName");
+
+            if (!originalName.equals(fileName)) {
+                script.append("# ").append(typeMarker).append(" ").append(originalName).append(" -> ").append(fileName).append("\n");
+            } else {
+                script.append("# ").append(typeMarker).append(" ").append(fileName).append("\n");
+            }
+            script.append("# Source: ").append(jar.get("versionSource")).append("\n");
+            script.append("# Coordonnée: ").append(jar.get("groupId")).append(":")
+                   .append(jar.get("artifactId")).append(":").append(jar.get("version")).append("\n");
+            script.append("echo \"Déploiement de ").append(fileName).append("...\"\n");
+            script.append(jar.get("deployCommand")).append("\n");
+            script.append("\n");
+        }
+
+        script.append("echo \"Terminé ! ").append(deployableJars.size()).append(" JARs déployés.\"\n");
+
+        Path scriptFile = scriptDir.resolve("deploy-to-nexus.sh");
+        Files.writeString(scriptFile, script.toString());
+        scriptFile.toFile().setExecutable(true);
+
+        log.info("Script deploy-to-nexus.sh généré pour {} JARs", deployableJars.size());
     }
 
     /**
@@ -453,6 +653,13 @@ public class ReportGenerator {
             if (config.isArtifactoryConfigured()) {
                 html.append("<tr><td><strong>Artifactory :</strong></td><td>").append(config.artifactoryUrl()).append("</td></tr>");
                 html.append("<tr><td><strong>Dépôt Release :</strong></td><td>").append(config.artifactoryReleaseRepo()).append("</td></tr>");
+            }
+            if (config.isNexusConfigured()) {
+                html.append("<tr><td><strong>Nexus :</strong></td><td>").append(config.nexusUrl()).append("</td></tr>");
+                html.append("<tr><td><strong>Dépôt Nexus :</strong></td><td>").append(config.nexusRepository()).append("</td></tr>");
+            }
+            if (config.isRemoteDeployment() && config.remoteTarget() != null) {
+                html.append("<tr><td><strong>Cible Remote :</strong></td><td>").append(config.remoteTarget()).append("</td></tr>");
             }
             html.append("</table>");
         }
@@ -613,12 +820,14 @@ public class ReportGenerator {
         // =====================================================================
         // SECTION : Bibliothèques résolues (Maven Central ou Artifactory uniquement)
         // =====================================================================
-        // Seules les bibliothèques trouvées sur Maven Central ou Artifactory sont "résolues"
+        // Seules les bibliothèques trouvées sur Maven Central, Artifactory ou Nexus sont "résolues"
         // Inclut INTERNAL_PATTERN si les coordonnées ne nécessitent pas d'installation locale
         List<DependencyInfo> trulyResolved = analysis.resolved().stream()
             .filter(d -> d.method() == ResolutionMethod.CHECKSUM ||
                         d.method() == ResolutionMethod.ARTIFACTORY ||
                         d.method() == ResolutionMethod.ARTIFACTORY_CHECKSUM ||
+                        d.method() == ResolutionMethod.NEXUS ||
+                        d.method() == ResolutionMethod.NEXUS_CHECKSUM ||
                         (d.method() == ResolutionMethod.KNOWN_CONFIG && !d.needsLocalInstall()) ||
                         (d.method() == ResolutionMethod.INTERNAL_PATTERN && !d.needsLocalInstall()))
             .toList();
@@ -683,6 +892,37 @@ public class ReportGenerator {
                 html.append("<h4>Internes fr.cnam* (").append(artInternal.size()).append(")</h4>");
                 html.append("<table><tr><th>JAR d'origine</th><th>Coordonnées Maven</th><th>Méthode</th></tr>");
                 for (DependencyInfo dep : artInternal) {
+                    appendResolvedDependencyRow(html, dep);
+                }
+                html.append("</table>");
+            }
+        }
+
+        // Sous-section : Résolues depuis Nexus
+        List<DependencyInfo> resolvedNexus = trulyResolved.stream()
+            .filter(d -> d.method() == ResolutionMethod.NEXUS ||
+                        d.method() == ResolutionMethod.NEXUS_CHECKSUM)
+            .toList();
+
+        if (!resolvedNexus.isEmpty()) {
+            List<DependencyInfo> nexusExternal = resolvedNexus.stream().filter(d -> !d.isInternal()).toList();
+            List<DependencyInfo> nexusInternal = resolvedNexus.stream().filter(DependencyInfo::isInternal).toList();
+
+            html.append("<h3 class='success'>Depuis Nexus (").append(resolvedNexus.size()).append(")</h3>");
+
+            if (!nexusExternal.isEmpty()) {
+                html.append("<h4>Externes (").append(nexusExternal.size()).append(")</h4>");
+                html.append("<table><tr><th>JAR d'origine</th><th>Coordonnées Maven</th><th>Méthode</th></tr>");
+                for (DependencyInfo dep : nexusExternal) {
+                    appendResolvedDependencyRow(html, dep);
+                }
+                html.append("</table>");
+            }
+
+            if (!nexusInternal.isEmpty()) {
+                html.append("<h4>Internes fr.cnam* (").append(nexusInternal.size()).append(")</h4>");
+                html.append("<table><tr><th>JAR d'origine</th><th>Coordonnées Maven</th><th>Méthode</th></tr>");
+                for (DependencyInfo dep : nexusInternal) {
                     appendResolvedDependencyRow(html, dep);
                 }
                 html.append("</table>");
@@ -816,6 +1056,8 @@ public class ReportGenerator {
             case INTERNAL_PATTERN -> "Pattern d'artefact interne";
             case ARTIFACTORY_CHECKSUM -> "Checksum Artifactory";
             case ARTIFACTORY -> "Recherche Artifactory";
+            case NEXUS_CHECKSUM -> "Checksum Nexus";
+            case NEXUS -> "Recherche Nexus";
             case CHECKSUM -> "Checksum Maven Central";
             case MANIFEST -> "Analyse MANIFEST.MF";
             case PATTERN -> "Pattern de nom de fichier";

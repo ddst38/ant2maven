@@ -256,6 +256,14 @@ public class ArtifactoryClient {
      */
     public String generateDeployCommand(Path jarPath, MavenCoordinate coord, boolean isSnapshot) {
         String repo = isSnapshot ? config.artifactorySnapshotRepo() : config.artifactoryReleaseRepo();
+        return generateDeployCommand(jarPath, coord, repo);
+    }
+
+    /**
+     * Génère un script de déploiement avec un repository spécifique.
+     */
+    public String generateDeployCommand(Path jarPath, MavenCoordinate coord, String deployRepo) {
+        String repo = deployRepo;
 
         // Générer la commande curl
         StringBuilder cmd = new StringBuilder();

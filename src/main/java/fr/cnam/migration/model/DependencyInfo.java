@@ -26,12 +26,35 @@ public record DependencyInfo(
 
     /**
      * Vérifie si cette dépendance nécessite une installation locale.
-     * Une dépendance nécessite une installation locale si sa version est "LOCAL"
-     * ou commence par "SHA-" (version basée sur le checksum du JAR).
+     *
+     * Une dépendance NE nécessite PAS d'installation locale si :
+     * - Elle a été résolue sur un repository distant (Nexus, Artifactory, Maven Central)
+     *
+     * Une dépendance nécessite une installation locale si :
+     * - Sa version est "LOCAL" ou commence par "SHA-" ET
+     * - Elle n'a pas été résolue sur un repository distant
      */
     public boolean needsLocalInstall() {
+        // Si résolu sur un repo distant, pas besoin d'installation locale
+        if (isResolvedOnRemoteRepository()) {
+            return false;
+        }
+
+        // Sinon, vérifier la version
         String version = coordinate.version();
         return "LOCAL".equals(version) || version.startsWith("SHA-");
+    }
+
+    /**
+     * Vérifie si cette dépendance a été résolue sur un repository distant
+     * (Nexus, Artifactory ou Maven Central).
+     */
+    public boolean isResolvedOnRemoteRepository() {
+        return method == ResolutionMethod.NEXUS ||
+               method == ResolutionMethod.NEXUS_CHECKSUM ||
+               method == ResolutionMethod.ARTIFACTORY ||
+               method == ResolutionMethod.ARTIFACTORY_CHECKSUM ||
+               method == ResolutionMethod.CHECKSUM;
     }
 
     public String groupId() {

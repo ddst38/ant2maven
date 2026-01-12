@@ -1,6 +1,7 @@
 package fr.cnam.migration.autofix;
 
 import fr.cnam.migration.autofix.model.ProvidedDependency;
+import fr.cnam.migration.model.MavenCoordinate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.w3c.dom.*;
@@ -22,13 +23,68 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * Injecte des dependances provided dans un fichier pom.xml.
+ * Injecte des dependances dans un fichier pom.xml.
+ * Supporte les dépendances provided (lib-provided) et les dépendances Maven normales (Nexus).
  */
 public class PomDependencyInjector {
 
     private static final Logger log = LoggerFactory.getLogger(PomDependencyInjector.class);
 
     private static final String MAVEN_NAMESPACE = "http://maven.apache.org/POM/4.0.0";
+
+    /**
+     * Ajoute une liste de dependances Maven normales (scope compile) au pom.xml.
+     * Ces dépendances sont résolues depuis un repository distant (Nexus, Maven Central).
+     */
+    public int addMavenDependencies(Path pomFile, List<MavenCoordinate> dependencies) throws IOException {
+        if (!Files.exists(pomFile)) {
+            log.error("Fichier pom.xml introuvable : {}", pomFile);
+            return 0;
+        }
+
+        try {
+            DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+            factory.setNamespaceAware(true);
+            DocumentBuilder builder = factory.newDocumentBuilder();
+            Document doc = builder.parse(pomFile.toFile());
+
+            Element root = doc.getDocumentElement();
+            Element dependenciesElement = findOrCreateDependencies(doc, root);
+            Set<String> existingDeps = getExistingDependencies(dependenciesElement);
+
+            int addedCount = 0;
+            for (MavenCoordinate coord : dependencies) {
+                String key = coord.groupId() + ":" + coord.artifactId();
+                if (existingDeps.contains(key)) {
+                    log.debug("Dependance deja presente : {}", key);
+                    continue;
+                }
+
+                Element depElement = createMavenDependencyElement(doc, coord);
+                Node firstChild = dependenciesElement.getFirstChild();
+                if (firstChild != null) {
+                    dependenciesElement.insertBefore(depElement, firstChild);
+                } else {
+                    dependenciesElement.appendChild(depElement);
+                }
+                existingDeps.add(key);
+                addedCount++;
+
+                log.info("Dependance Maven ajoutee : {}", coord.toGav());
+            }
+
+            if (addedCount > 0) {
+                saveDocument(doc, pomFile);
+            }
+
+            return addedCount;
+
+        } catch (ParserConfigurationException | SAXException e) {
+            throw new IOException("Erreur lors du parsing du pom.xml : " + e.getMessage(), e);
+        } catch (Exception e) {
+            throw new IOException("Erreur lors de la modification du pom.xml : " + e.getMessage(), e);
+        }
+    }
 
     /**
      * Ajoute une liste de dependances provided au pom.xml.
@@ -166,6 +222,29 @@ public class PomDependencyInjector {
         Element scope = doc.createElement("scope");
         scope.setTextContent("provided");
         dependency.appendChild(scope);
+
+        return dependency;
+    }
+
+    /**
+     * Cree un element <dependency> sans scope (compile par defaut).
+     */
+    private Element createMavenDependencyElement(Document doc, MavenCoordinate coord) {
+        Element dependency = doc.createElement("dependency");
+
+        Element groupId = doc.createElement("groupId");
+        groupId.setTextContent(coord.groupId());
+        dependency.appendChild(groupId);
+
+        Element artifactId = doc.createElement("artifactId");
+        artifactId.setTextContent(coord.artifactId());
+        dependency.appendChild(artifactId);
+
+        Element version = doc.createElement("version");
+        version.setTextContent(coord.version());
+        dependency.appendChild(version);
+
+        // Pas de scope = compile par defaut
 
         return dependency;
     }

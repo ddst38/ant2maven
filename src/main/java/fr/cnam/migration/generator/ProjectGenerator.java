@@ -1272,15 +1272,11 @@ public class ProjectGenerator {
             }
         }
 
-        // Copier settings.xml (avec localRepository pointant vers localMvnRepository)
-        try (var settingsStream = getClass().getResourceAsStream("/maven-wrapper/settings.xml")) {
-            if (settingsStream != null) {
-                Files.copy(settingsStream, mvnWrapperDir.resolve("settings.xml"),
-                    java.nio.file.StandardCopyOption.REPLACE_EXISTING);
-            } else {
-                log.warn("Ressource settings.xml introuvable");
-            }
-        }
+        // Générer settings.xml avec chemin ABSOLU vers localMvnRepository
+        // Un chemin relatif ne fonctionne pas de manière fiable dans tous les environnements (Docker, Jenkins, etc.)
+        Path localRepoAbsolutePath = outputDir.toAbsolutePath().resolve("localMvnRepository");
+        String settingsXml = generateSettingsXml(localRepoAbsolutePath);
+        Files.writeString(mvnWrapperDir.resolve("settings.xml"), settingsXml);
 
         // Créer le répertoire localMvnRepository pour le repository local autonome
         Path localRepoDir = outputDir.resolve("localMvnRepository");
@@ -1308,6 +1304,215 @@ public class ProjectGenerator {
         }
 
         log.info("Maven wrapper installé avec repository local autonome");
+    }
+
+    /**
+     * Génère le contenu du fichier settings.xml pour Maven.
+     * Configure le repository local et optionnellement les mirrors Nexus/Artifactory.
+     *
+     * @param localRepoPath Chemin absolu vers le repository local
+     * @return Le contenu XML du fichier settings.xml
+     */
+    private String generateSettingsXml(Path localRepoPath) {
+        StringBuilder xml = new StringBuilder();
+        xml.append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
+        xml.append("<settings xmlns=\"http://maven.apache.org/SETTINGS/1.0.0\"\n");
+        xml.append("          xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"\n");
+        xml.append("          xsi:schemaLocation=\"http://maven.apache.org/SETTINGS/1.0.0\n");
+        xml.append("                              http://maven.apache.org/xsd/settings-1.0.0.xsd\">\n");
+        xml.append("\n");
+        xml.append("    <!-- Chemin absolu requis pour fonctionner dans tous les environnements (local, Docker, Jenkins) -->\n");
+        xml.append("    <localRepository>").append(localRepoPath.toString()).append("</localRepository>\n");
+
+        // Variables communes
+        String deployRepo = config.deployRepository();
+        boolean hasNexus = config.isNexusConfigured();
+        boolean hasArtifactory = config.isArtifactoryConfigured();
+
+        // Générer la section servers si des credentials sont configurés
+        boolean hasNexusCredentials = hasNexus &&
+            config.nexusUsername() != null && !config.nexusUsername().isBlank();
+        boolean hasArtifactoryCredentials = hasArtifactory &&
+            config.artifactoryUsername() != null && !config.artifactoryUsername().isBlank();
+
+        if (hasNexusCredentials || hasArtifactoryCredentials) {
+            xml.append("\n");
+            xml.append("    <!-- Credentials pour les repositories distants -->\n");
+            xml.append("    <servers>\n");
+
+            if (hasNexusCredentials) {
+                // Server pour le mirror nexus (maven-public)
+                xml.append("        <server>\n");
+                xml.append("            <id>nexus</id>\n");
+                xml.append("            <username>").append(config.nexusUsername()).append("</username>\n");
+                xml.append("            <password>${env.NEXUS_PASSWORD}</password>\n");
+                xml.append("        </server>\n");
+                // Server pour le repository de déploiement (même credentials)
+                if (deployRepo != null && !deployRepo.isBlank()) {
+                    xml.append("        <server>\n");
+                    xml.append("            <id>").append(deployRepo).append("</id>\n");
+                    xml.append("            <username>").append(config.nexusUsername()).append("</username>\n");
+                    xml.append("            <password>${env.NEXUS_PASSWORD}</password>\n");
+                    xml.append("        </server>\n");
+                    // Server pour maven-releases
+                    xml.append("        <server>\n");
+                    xml.append("            <id>nexus-releases</id>\n");
+                    xml.append("            <username>").append(config.nexusUsername()).append("</username>\n");
+                    xml.append("            <password>${env.NEXUS_PASSWORD}</password>\n");
+                    xml.append("        </server>\n");
+                    // Server pour maven-snapshots
+                    xml.append("        <server>\n");
+                    xml.append("            <id>nexus-snapshots</id>\n");
+                    xml.append("            <username>").append(config.nexusUsername()).append("</username>\n");
+                    xml.append("            <password>${env.NEXUS_PASSWORD}</password>\n");
+                    xml.append("        </server>\n");
+                }
+            }
+
+            if (hasArtifactoryCredentials) {
+                xml.append("        <server>\n");
+                xml.append("            <id>artifactory</id>\n");
+                xml.append("            <username>").append(config.artifactoryUsername()).append("</username>\n");
+                xml.append("            <password>${env.ARTIFACTORY_PASSWORD}</password>\n");
+                xml.append("        </server>\n");
+                if (deployRepo != null && !deployRepo.isBlank()) {
+                    xml.append("        <server>\n");
+                    xml.append("            <id>").append(deployRepo).append("</id>\n");
+                    xml.append("            <username>").append(config.artifactoryUsername()).append("</username>\n");
+                    xml.append("            <password>${env.ARTIFACTORY_PASSWORD}</password>\n");
+                    xml.append("        </server>\n");
+                }
+            }
+
+            xml.append("    </servers>\n");
+        }
+
+        // Générer la section mirrors si Nexus ou Artifactory est configuré
+        if (hasNexus || hasArtifactory) {
+            xml.append("\n");
+            xml.append("    <!-- Mirrors pour rediriger les téléchargements vers le repository d'entreprise -->\n");
+            xml.append("    <mirrors>\n");
+
+            // Exclure les repositories explicites du mirror pour permettre l'accès direct
+            String mirrorOf = "*";
+            if (deployRepo != null && !deployRepo.isBlank()) {
+                // Exclure : deployRepo, maven-releases, maven-snapshots
+                mirrorOf = "*,!" + deployRepo + ",!nexus-releases,!nexus-snapshots";
+            }
+
+            // Priorité : Nexus si configuré, sinon Artifactory
+            if (hasNexus) {
+                String nexusMirrorUrl = config.nexusUrl();
+                // Construire l'URL du groupe public (convention Nexus)
+                if (!nexusMirrorUrl.endsWith("/")) {
+                    nexusMirrorUrl += "/";
+                }
+                nexusMirrorUrl += "repository/maven-public/";
+
+                xml.append("        <mirror>\n");
+                xml.append("            <id>nexus</id>\n");
+                xml.append("            <name>Nexus Repository Manager</name>\n");
+                xml.append("            <url>").append(nexusMirrorUrl).append("</url>\n");
+                xml.append("            <mirrorOf>").append(mirrorOf).append("</mirrorOf>\n");
+                xml.append("        </mirror>\n");
+
+                log.info("Configuration Maven : Nexus configuré comme mirror ({}) - exclusion: {}", nexusMirrorUrl, deployRepo);
+            } else if (hasArtifactory) {
+                String artifactoryMirrorUrl = config.artifactoryUrl();
+                // Construire l'URL du virtual repo (convention Artifactory)
+                if (!artifactoryMirrorUrl.endsWith("/")) {
+                    artifactoryMirrorUrl += "/";
+                }
+                artifactoryMirrorUrl += config.artifactoryReleaseRepo() + "/";
+
+                xml.append("        <mirror>\n");
+                xml.append("            <id>artifactory</id>\n");
+                xml.append("            <name>JFrog Artifactory</name>\n");
+                xml.append("            <url>").append(artifactoryMirrorUrl).append("</url>\n");
+                xml.append("            <mirrorOf>").append(mirrorOf).append("</mirrorOf>\n");
+                xml.append("        </mirror>\n");
+
+                log.info("Configuration Maven : Artifactory configuré comme mirror ({}) - exclusion: {}", artifactoryMirrorUrl, deployRepo);
+            }
+
+            xml.append("    </mirrors>\n");
+        }
+
+        // Générer la section profiles avec les repositories Nexus/Artifactory
+        if ((hasNexus || hasArtifactory) && deployRepo != null && !deployRepo.isBlank()) {
+            xml.append("\n");
+            xml.append("    <!-- Profil pour accéder aux repositories Nexus/Artifactory -->\n");
+            xml.append("    <profiles>\n");
+            xml.append("        <profile>\n");
+            xml.append("            <id>migration-repos</id>\n");
+            xml.append("            <repositories>\n");
+
+            if (hasNexus) {
+                String nexusBaseUrl = config.nexusUrl();
+                if (!nexusBaseUrl.endsWith("/")) {
+                    nexusBaseUrl += "/";
+                }
+
+                // Repository de déploiement (librairies migrées)
+                xml.append("                <repository>\n");
+                xml.append("                    <id>").append(deployRepo).append("</id>\n");
+                xml.append("                    <name>Repository des librairies migrées</name>\n");
+                xml.append("                    <url>").append(nexusBaseUrl).append("repository/").append(deployRepo).append("/</url>\n");
+                xml.append("                    <releases><enabled>true</enabled></releases>\n");
+                xml.append("                    <snapshots><enabled>true</enabled></snapshots>\n");
+                xml.append("                </repository>\n");
+
+                // Repository maven-releases (artefacts internes)
+                xml.append("                <repository>\n");
+                xml.append("                    <id>nexus-releases</id>\n");
+                xml.append("                    <name>Nexus Releases</name>\n");
+                xml.append("                    <url>").append(nexusBaseUrl).append("repository/maven-releases/</url>\n");
+                xml.append("                    <releases><enabled>true</enabled></releases>\n");
+                xml.append("                    <snapshots><enabled>false</enabled></snapshots>\n");
+                xml.append("                </repository>\n");
+
+                // Repository maven-snapshots (snapshots internes)
+                xml.append("                <repository>\n");
+                xml.append("                    <id>nexus-snapshots</id>\n");
+                xml.append("                    <name>Nexus Snapshots</name>\n");
+                xml.append("                    <url>").append(nexusBaseUrl).append("repository/maven-snapshots/</url>\n");
+                xml.append("                    <releases><enabled>false</enabled></releases>\n");
+                xml.append("                    <snapshots><enabled>true</enabled></snapshots>\n");
+                xml.append("                </repository>\n");
+
+                log.info("Configuration Maven : Repositories Nexus configurés ({}, maven-releases, maven-snapshots)", deployRepo);
+            } else if (hasArtifactory) {
+                String artifactoryBaseUrl = config.artifactoryUrl();
+                if (!artifactoryBaseUrl.endsWith("/")) {
+                    artifactoryBaseUrl += "/";
+                }
+
+                // Repository de déploiement
+                xml.append("                <repository>\n");
+                xml.append("                    <id>").append(deployRepo).append("</id>\n");
+                xml.append("                    <name>Repository des librairies migrées</name>\n");
+                xml.append("                    <url>").append(artifactoryBaseUrl).append(deployRepo).append("/</url>\n");
+                xml.append("                    <releases><enabled>true</enabled></releases>\n");
+                xml.append("                    <snapshots><enabled>true</enabled></snapshots>\n");
+                xml.append("                </repository>\n");
+
+                log.info("Configuration Maven : Repository Artifactory {} configuré", deployRepo);
+            }
+
+            xml.append("            </repositories>\n");
+            xml.append("        </profile>\n");
+            xml.append("    </profiles>\n");
+            xml.append("\n");
+            xml.append("    <!-- Activation automatique du profil migration-repos -->\n");
+            xml.append("    <activeProfiles>\n");
+            xml.append("        <activeProfile>migration-repos</activeProfile>\n");
+            xml.append("    </activeProfiles>\n");
+        }
+
+        xml.append("\n");
+        xml.append("</settings>\n");
+
+        return xml.toString();
     }
 
     /**
