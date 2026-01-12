@@ -67,8 +67,10 @@ public class ReportUiClient {
     private String getIdentificationSource(ResolutionMethod method) {
         return switch (method) {
             case ARTIFACTORY, ARTIFACTORY_CHECKSUM -> "ARTIFACTORY";
+            case NEXUS, NEXUS_CHECKSUM -> "NEXUS";
             case CHECKSUM -> "MAVEN_CENTRAL";
             case KNOWN_CONFIG -> "CACHE";
+            case INTERNAL_PATTERN, PATTERN -> "PATTERN";
             default -> null;
         };
     }
