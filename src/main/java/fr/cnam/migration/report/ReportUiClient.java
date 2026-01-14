@@ -411,6 +411,7 @@ public class ReportUiClient {
         stats.put("unresolvedInternal", unresolvedInternal);
         stats.put("unresolvedExternal", unresolvedExternal);
         stats.put("providedAutoFix", providedCount);
+        stats.put("autoFixEnabled", autoFixResult != null);
         stats.put("missingCount", missingCount);
         stats.put("successRate", Math.round(successRate * 10.0) / 10.0);
         stats.put("coverageRate", Math.round(coverageRate * 10.0) / 10.0);
