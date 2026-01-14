@@ -3,6 +3,7 @@ package fr.cnam.migration.report;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import fr.cnam.migration.config.JarNameCleaner;
+import fr.cnam.migration.config.MigrationConfig;
 import fr.cnam.migration.model.*;
 import fr.cnam.migration.analyzer.JarPackageAnalyzer;
 import fr.cnam.migration.autofix.model.AutoFixResult;
@@ -96,8 +97,25 @@ public class ReportUiClient {
      */
     public void submitReport(ProjectStructure project, AnalysisResult analysis,
                             AutoFixResult autoFixResult, CveAnalysisResult cveResult) {
+        submitReport(project, analysis, autoFixResult, cveResult, null, null);
+    }
+
+    /**
+     * Soumet un rapport de migration complet avec informations de déploiement.
+     *
+     * @param project Structure du projet
+     * @param analysis Résultat de l'analyse des dépendances
+     * @param autoFixResult Résultat de l'auto-fix (peut être null)
+     * @param cveResult Résultat de l'analyse CVE (peut être null)
+     * @param config Configuration de migration (pour infos de déploiement)
+     * @param deployedLibraries Liste des librairies déployées sur le repository distant
+     */
+    public void submitReport(ProjectStructure project, AnalysisResult analysis,
+                            AutoFixResult autoFixResult, CveAnalysisResult cveResult,
+                            MigrationConfig config, List<DeployedLibrary> deployedLibraries) {
         try {
-            Map<String, Object> request = buildRequest(project, analysis, autoFixResult, cveResult);
+            Map<String, Object> request = buildRequest(project, analysis, autoFixResult, cveResult,
+                                                       config, deployedLibraries);
             String jsonBody = objectMapper.writeValueAsString(request);
 
             HttpRequest httpRequest = HttpRequest.newBuilder()
@@ -129,7 +147,8 @@ public class ReportUiClient {
      * Construit la requête de création de rapport à partir des modèles ant2maven.
      */
     private Map<String, Object> buildRequest(ProjectStructure project, AnalysisResult analysis,
-                                             AutoFixResult autoFixResult, CveAnalysisResult cveResult) {
+                                             AutoFixResult autoFixResult, CveAnalysisResult cveResult,
+                                             MigrationConfig config, List<DeployedLibrary> deployedLibraries) {
         Map<String, Object> request = new LinkedHashMap<>();
         request.put("projectName", project.name());
         request.put("migrationDate", LocalDateTime.now().toString());
@@ -145,8 +164,63 @@ public class ReportUiClient {
             request.put("cveSummary", buildCveSummary(cveResult));
         }
 
+        // Informations de déploiement (mode REMOTE uniquement)
+        if (config != null && config.isRemoteDeployment() && deployedLibraries != null && !deployedLibraries.isEmpty()) {
+            request.put("deploymentInfo", buildDeploymentInfo(config, deployedLibraries));
+        }
+
         return request;
     }
+
+    /**
+     * Construit les informations de déploiement vers Artifactory/Nexus.
+     */
+    private Map<String, Object> buildDeploymentInfo(MigrationConfig config, List<DeployedLibrary> deployedLibraries) {
+        Map<String, Object> info = new LinkedHashMap<>();
+
+        // Type de repository (ARTIFACTORY ou NEXUS)
+        String repoType = config.isNexusDeployment() ? "NEXUS" : "ARTIFACTORY";
+        info.put("repositoryType", repoType);
+
+        // URL du repository
+        String repoUrl = config.isNexusDeployment()
+            ? config.nexusUrl() + "/repository/" + config.deployRepository()
+            : config.artifactoryUrl() + "/" + config.deployRepository();
+        info.put("repositoryUrl", repoUrl);
+
+        // Nom du repository
+        info.put("repositoryName", config.deployRepository());
+
+        // Liste des librairies déployées
+        List<Map<String, Object>> libs = new ArrayList<>();
+        for (DeployedLibrary lib : deployedLibraries) {
+            Map<String, Object> libData = new LinkedHashMap<>();
+            libData.put("groupId", lib.groupId());
+            libData.put("artifactId", lib.artifactId());
+            libData.put("version", lib.version());
+            libData.put("gav", lib.groupId() + ":" + lib.artifactId() + ":" + lib.version());
+            libData.put("originalJar", lib.originalJarName());
+            libData.put("type", lib.type()); // INTERNAL, EXTERNAL, PROVIDED
+            libData.put("size", lib.size());
+            libs.add(libData);
+        }
+        info.put("deployedLibraries", libs);
+        info.put("deployedCount", libs.size());
+
+        return info;
+    }
+
+    /**
+     * Record représentant une librairie déployée sur un repository distant.
+     */
+    public record DeployedLibrary(
+        String groupId,
+        String artifactId,
+        String version,
+        String originalJarName,
+        String type,  // INTERNAL, EXTERNAL, PROVIDED
+        long size
+    ) {}
 
     /**
      * Construit la liste des vulnérabilités CVE.

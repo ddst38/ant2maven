@@ -1049,6 +1049,13 @@ public class ReportGenerator {
             appendCveSection(html, cveResult);
         }
 
+        // =====================================================================
+        // SECTION : Librairies déployées (mode REMOTE uniquement)
+        // =====================================================================
+        if (config != null && config.isRemoteDeployment()) {
+            appendDeployedLibrariesSection(html, analysis, autoFixResult, config);
+        }
+
         // Informations du projet
         html.append("<h2>Informations sur le projet</h2>");
         html.append("<table>");
@@ -1276,4 +1283,150 @@ public class ReportGenerator {
             html.append("</div>");
         }
     }
+
+    /**
+     * Génère la section des librairies déployées sur le repository distant (mode REMOTE).
+     */
+    private void appendDeployedLibrariesSection(StringBuilder html, AnalysisResult analysis,
+                                                 AutoFixResult autoFixResult, MigrationConfig config) {
+        // Collecter les librairies déployées
+        List<DeployedLibInfo> deployedLibs = new ArrayList<>();
+        String basePackage = config.basePackage();
+        JarPackageAnalyzer packageAnalyzer = new JarPackageAnalyzer();
+
+        // 1. Dépendances locales (version SHA)
+        for (DependencyInfo dep : analysis.localDependencies()) {
+            JarInfo jar = dep.sourceJar();
+            String type = dep.isInternal() ? "INTERNAL" : "EXTERNAL";
+            deployedLibs.add(new DeployedLibInfo(
+                dep.groupId(), dep.artifactId(), dep.version(),
+                jar != null ? jar.name() : dep.artifactId() + ".jar",
+                type, jar != null ? jar.size() : 0
+            ));
+        }
+
+        // 2. JARs non résolus
+        for (AnalysisResult.UnresolvedJar unresolved : analysis.unresolved()) {
+            JarInfo jar = unresolved.jar();
+            String cleanedName = JarNameCleaner.clean(jar.name());
+            String artifactName = cleanedName.replace(".jar", "");
+            String version = jar.sha1() != null ? "SHA-" + jar.sha1() : "UNKNOWN";
+
+            String groupId;
+            JarPackageAnalyzer.PackageAnalysis pkgAnalysis = packageAnalyzer.analyze(jar.path());
+            if (pkgAnalysis.inferredGroupId() != null) {
+                groupId = pkgAnalysis.inferredGroupId();
+            } else {
+                groupId = basePackage;
+            }
+            String type = groupId.startsWith("fr.cnam") ? "INTERNAL" : "EXTERNAL";
+
+            deployedLibs.add(new DeployedLibInfo(
+                groupId, artifactName, version, jar.name(), type, jar.size()
+            ));
+        }
+
+        // 3. Dépendances provided (auto-fix)
+        if (autoFixResult != null && autoFixResult.addedDependencies() != null) {
+            for (ProvidedDependency provided : autoFixResult.addedDependencies()) {
+                long size = 0;
+                try {
+                    size = Files.size(provided.jarPath());
+                } catch (Exception ignored) {}
+
+                deployedLibs.add(new DeployedLibInfo(
+                    provided.groupId(), provided.artifactId(), provided.version(),
+                    provided.jarPath().getFileName().toString(),
+                    "PROVIDED", size
+                ));
+            }
+        }
+
+        if (deployedLibs.isEmpty()) {
+            return;
+        }
+
+        // Déterminer le type et l'URL du repository
+        String repoType = config.isNexusDeployment() ? "Nexus" : "Artifactory";
+        String repoUrl = config.isNexusDeployment()
+            ? config.nexusUrl() + "/repository/" + config.deployRepository()
+            : config.artifactoryUrl() + "/" + config.deployRepository();
+        String repoName = config.deployRepository();
+
+        // Compter par type
+        long internalCount = deployedLibs.stream().filter(l -> "INTERNAL".equals(l.type)).count();
+        long externalCount = deployedLibs.stream().filter(l -> "EXTERNAL".equals(l.type)).count();
+        long providedCount = deployedLibs.stream().filter(l -> "PROVIDED".equals(l.type)).count();
+
+        // Générer la section HTML
+        html.append("<h2 class='success'>📦 Librairies déployées sur ").append(repoType)
+            .append(" (").append(deployedLibs.size()).append(")</h2>");
+
+        html.append("<p><em>Ces librairies ont été ou seront déployées sur le repository distant ");
+        html.append("<code>").append(repoName).append("</code>.</em></p>");
+
+        html.append("<p><strong>URL du repository :</strong> <a href='").append(repoUrl)
+            .append("' target='_blank'>").append(repoUrl).append("</a></p>");
+
+        // Statistiques
+        html.append("<div>");
+        html.append("<span class='stat-box' style='background:#dbeafe'><span class='stat-value' style='color:#2563eb'>")
+            .append(internalCount).append("</span><br><span class='stat-label'>Internes</span></span>");
+        html.append("<span class='stat-box' style='background:#f3e8ff'><span class='stat-value' style='color:#9333ea'>")
+            .append(externalCount).append("</span><br><span class='stat-label'>Externes</span></span>");
+        html.append("<span class='stat-box' style='background:#dcfce7'><span class='stat-value' style='color:#16a34a'>")
+            .append(providedCount).append("</span><br><span class='stat-label'>Provided</span></span>");
+        html.append("</div>");
+
+        // Tableau des librairies
+        html.append("<table><tr><th>GroupId</th><th>ArtifactId</th><th>Version</th><th>Type</th><th>JAR Original</th><th>Taille</th></tr>");
+
+        for (DeployedLibInfo lib : deployedLibs) {
+            String typeClass = switch (lib.type) {
+                case "INTERNAL" -> "info";
+                case "EXTERNAL" -> "warning";
+                case "PROVIDED" -> "success";
+                default -> "";
+            };
+            String typeLabel = switch (lib.type) {
+                case "INTERNAL" -> "Interne";
+                case "EXTERNAL" -> "Externe";
+                case "PROVIDED" -> "Provided";
+                default -> lib.type;
+            };
+
+            html.append("<tr>");
+            html.append("<td><code>").append(lib.groupId).append("</code></td>");
+            html.append("<td><code>").append(lib.artifactId).append("</code></td>");
+            html.append("<td>").append(truncateVersion(lib.version)).append("</td>");
+            html.append("<td class='").append(typeClass).append("'>").append(typeLabel).append("</td>");
+            html.append("<td><code>").append(lib.originalJar).append("</code></td>");
+            html.append("<td>").append(formatSize(lib.size)).append("</td>");
+            html.append("</tr>");
+        }
+
+        html.append("</table>");
+    }
+
+    /**
+     * Tronque une version SHA si trop longue.
+     */
+    private String truncateVersion(String version) {
+        if (version != null && version.startsWith("SHA-") && version.length() > 20) {
+            return version.substring(0, 17) + "...";
+        }
+        return version;
+    }
+
+    /**
+     * Record interne pour stocker les infos des librairies déployées.
+     */
+    private record DeployedLibInfo(
+        String groupId,
+        String artifactId,
+        String version,
+        String originalJar,
+        String type,
+        long size
+    ) {}
 }

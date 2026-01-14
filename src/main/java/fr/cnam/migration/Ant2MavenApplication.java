@@ -10,6 +10,8 @@ import fr.cnam.migration.cve.CveAnalyzer;
 import fr.cnam.migration.generator.ProjectGenerator;
 import fr.cnam.migration.model.AnalysisResult;
 import fr.cnam.migration.model.CveAnalysisResult;
+import fr.cnam.migration.model.DependencyInfo;
+import fr.cnam.migration.model.JarInfo;
 import fr.cnam.migration.model.ProjectStructure;
 import fr.cnam.migration.report.ReportGenerator;
 import fr.cnam.migration.report.ReportUiClient;
@@ -22,6 +24,8 @@ import picocli.CommandLine.Option;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Callable;
 
@@ -476,7 +480,12 @@ public class Ant2MavenApplication implements Callable<Integer> {
                 log.info("Submitting report to ReportUI at {}...", reportUiUrl);
                 try {
                     ReportUiClient reportUiClient = new ReportUiClient(reportUiUrl, config.basePackage());
-                    reportUiClient.submitReport(project, analysis, fixResult, cveResult);
+                    // Collecter les librairies déployées si mode REMOTE
+                    List<ReportUiClient.DeployedLibrary> deployedLibraries = null;
+                    if (config.isRemoteDeployment()) {
+                        deployedLibraries = collectDeployedLibraries(analysis, fixResult, config);
+                    }
+                    reportUiClient.submitReport(project, analysis, fixResult, cveResult, config, deployedLibraries);
                 } catch (Exception e) {
                     log.warn("Failed to submit report to ReportUI: {}", e.getMessage());
                 }
@@ -567,6 +576,81 @@ public class Ant2MavenApplication implements Callable<Integer> {
             log.error("Déploiement interrompu");
             Thread.currentThread().interrupt();
         }
+    }
+
+    /**
+     * Collecte les librairies qui ont été déployées sur le repository distant.
+     * Inclut les dépendances locales, non résolues et provided (auto-fix).
+     */
+    private List<ReportUiClient.DeployedLibrary> collectDeployedLibraries(
+            AnalysisResult analysis, AutoFixResult autoFixResult, MigrationConfig config) {
+
+        List<ReportUiClient.DeployedLibrary> deployed = new ArrayList<>();
+        String basePackage = config.basePackage();
+
+        // 1. Dépendances nécessitant installation locale (version SHA)
+        for (DependencyInfo dep : analysis.localDependencies()) {
+            JarInfo jar = dep.sourceJar();
+            String type = dep.isInternal() ? "INTERNAL" : "EXTERNAL";
+            deployed.add(new ReportUiClient.DeployedLibrary(
+                dep.groupId(),
+                dep.artifactId(),
+                dep.version(),
+                jar != null ? jar.name() : dep.artifactId() + ".jar",
+                type,
+                jar != null ? jar.size() : 0
+            ));
+        }
+
+        // 2. JARs non résolus
+        fr.cnam.migration.analyzer.JarPackageAnalyzer packageAnalyzer =
+            new fr.cnam.migration.analyzer.JarPackageAnalyzer();
+        for (AnalysisResult.UnresolvedJar unresolved : analysis.unresolved()) {
+            JarInfo jar = unresolved.jar();
+            String cleanedName = fr.cnam.migration.config.JarNameCleaner.clean(jar.name());
+            String artifactName = cleanedName.replace(".jar", "");
+            String version = jar.sha1() != null ? "SHA-" + jar.sha1() : "UNKNOWN";
+
+            // Analyser le package pour déterminer le groupId
+            String groupId;
+            var pkgAnalysis = packageAnalyzer.analyze(jar.path());
+            if (pkgAnalysis.inferredGroupId() != null) {
+                groupId = pkgAnalysis.inferredGroupId();
+            } else {
+                groupId = basePackage;
+            }
+            String type = groupId.startsWith("fr.cnam") ? "INTERNAL" : "EXTERNAL";
+
+            deployed.add(new ReportUiClient.DeployedLibrary(
+                groupId,
+                artifactName,
+                version,
+                jar.name(),
+                type,
+                jar.size()
+            ));
+        }
+
+        // 3. Dépendances provided (ajoutées par auto-fix)
+        if (autoFixResult != null && autoFixResult.addedDependencies() != null) {
+            for (var provided : autoFixResult.addedDependencies()) {
+                long size = 0;
+                try {
+                    size = java.nio.file.Files.size(provided.jarPath());
+                } catch (Exception ignored) {}
+
+                deployed.add(new ReportUiClient.DeployedLibrary(
+                    provided.groupId(),
+                    provided.artifactId(),
+                    provided.version(),
+                    provided.jarPath().getFileName().toString(),
+                    "PROVIDED",
+                    size
+                ));
+            }
+        }
+
+        return deployed;
     }
 
     /**
