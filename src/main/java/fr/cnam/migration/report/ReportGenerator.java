@@ -10,6 +10,9 @@ import fr.cnam.migration.config.MigrationConfig;
 import fr.cnam.migration.generator.TemplateService;
 import fr.cnam.migration.model.*;
 import fr.cnam.migration.autofix.model.AutoFixResult;
+import fr.cnam.migration.model.CveAnalysisResult;
+import fr.cnam.migration.model.CveInfo;
+import fr.cnam.migration.model.CveSeverity;
 import fr.cnam.migration.autofix.model.MissingDependency;
 import fr.cnam.migration.autofix.model.ProvidedDependency;
 import org.apache.commons.csv.CSVFormat;
@@ -592,7 +595,7 @@ public class ReportGenerator {
      */
     public void generateMigrationReport(ProjectStructure project, AnalysisResult analysis,
                                         Path outputDir) throws IOException {
-        generateMigrationReport(project, analysis, outputDir, null);
+        generateMigrationReport(project, analysis, outputDir, null, null);
     }
 
     /**
@@ -601,6 +604,17 @@ public class ReportGenerator {
      */
     public void generateMigrationReport(ProjectStructure project, AnalysisResult analysis,
                                         Path outputDir, AutoFixResult autoFixResult) throws IOException {
+        generateMigrationReport(project, analysis, outputDir, autoFixResult, null);
+    }
+
+    /**
+     * Génère un rapport de migration HTML avec analyse CVE.
+     * @param autoFixResult Résultat de l'auto-fix (peut être null)
+     * @param cveResult Résultat de l'analyse CVE (peut être null)
+     */
+    public void generateMigrationReport(ProjectStructure project, AnalysisResult analysis,
+                                        Path outputDir, AutoFixResult autoFixResult,
+                                        CveAnalysisResult cveResult) throws IOException {
         Files.createDirectories(outputDir);
         Path reportFile = outputDir.resolve("migration-report.html");
 
@@ -1028,6 +1042,13 @@ public class ReportGenerator {
             html.append("<p class='info'><strong>Actions suggérées :</strong> Ajouter les JARs manquants dans <code>lib-provided/</code> puis relancer avec <code>--auto-fix</code></p>");
         }
 
+        // =====================================================================
+        // SECTION : Analyse des vulnérabilités CVE
+        // =====================================================================
+        if (cveResult != null && cveResult.analysisPerformed()) {
+            appendCveSection(html, cveResult);
+        }
+
         // Informations du projet
         html.append("<h2>Informations sur le projet</h2>");
         html.append("<table>");
@@ -1120,5 +1141,139 @@ public class ReportGenerator {
         if (bytes < 1024) return bytes + " B";
         if (bytes < 1024 * 1024) return String.format("%.1f KB", bytes / 1024.0);
         return String.format("%.1f MB", bytes / (1024.0 * 1024.0));
+    }
+
+    /**
+     * Génère la section CVE du rapport HTML.
+     */
+    private void appendCveSection(StringBuilder html, CveAnalysisResult cveResult) {
+        // Styles CSS additionnels pour CVE
+        html.append("""
+            <style>
+                .cve-critical { background-color: #1a1a1a; color: white; }
+                .cve-high { background-color: #dc2626; color: white; }
+                .cve-medium { background-color: #f97316; color: white; }
+                .cve-low { background-color: #eab308; color: black; }
+                .cve-none { background-color: #22c55e; color: white; }
+                .cve-badge { padding: 2px 8px; border-radius: 4px; font-weight: bold; font-size: 0.85em; }
+                .cve-stats { display: flex; gap: 15px; flex-wrap: wrap; margin: 15px 0; }
+                .cve-stat-box { padding: 10px 15px; border-radius: 5px; text-align: center; min-width: 80px; }
+                .cve-score { font-size: 1.2em; font-weight: bold; }
+            </style>
+            """);
+
+        // Titre section
+        String titleClass = cveResult.hasCriticalVulnerabilities() ? "error" :
+                           (cveResult.hasVulnerabilities() ? "warning" : "success");
+        String titleIcon = cveResult.hasCriticalVulnerabilities() ? "🛑" :
+                          (cveResult.hasVulnerabilities() ? "⚠️" : "✅");
+
+        html.append("<h2 class='").append(titleClass).append("'>")
+            .append(titleIcon).append(" Analyse des vulnérabilités CVE (")
+            .append(cveResult.totalCount()).append(")</h2>");
+
+        if (!cveResult.hasVulnerabilities()) {
+            html.append("<p class='success'><strong>Aucune vulnérabilité CVE détectée !</strong> ");
+            html.append("Le projet n'utilise pas de bibliothèques avec des failles de sécurité connues.</p>");
+            return;
+        }
+
+        // Résumé statistique
+        html.append("<div class='cve-stats'>");
+
+        if (cveResult.criticalCount() > 0) {
+            html.append("<div class='cve-stat-box cve-critical'>");
+            html.append("<div class='cve-score'>").append(cveResult.criticalCount()).append("</div>");
+            html.append("<div>Critiques</div></div>");
+        }
+        if (cveResult.highCount() > 0) {
+            html.append("<div class='cve-stat-box cve-high'>");
+            html.append("<div class='cve-score'>").append(cveResult.highCount()).append("</div>");
+            html.append("<div>Hautes</div></div>");
+        }
+        if (cveResult.mediumCount() > 0) {
+            html.append("<div class='cve-stat-box cve-medium'>");
+            html.append("<div class='cve-score'>").append(cveResult.mediumCount()).append("</div>");
+            html.append("<div>Moyennes</div></div>");
+        }
+        if (cveResult.lowCount() > 0) {
+            html.append("<div class='cve-stat-box cve-low'>");
+            html.append("<div class='cve-score'>").append(cveResult.lowCount()).append("</div>");
+            html.append("<div>Basses</div></div>");
+        }
+
+        html.append("<div class='stat-box'>");
+        html.append("<div class='stat-value'>").append(cveResult.riskScore()).append("</div>");
+        html.append("<div class='stat-label'>Score de risque</div></div>");
+
+        html.append("<div class='stat-box'>");
+        html.append("<div class='stat-value'>").append(cveResult.byLibrary().size()).append("</div>");
+        html.append("<div class='stat-label'>Librairies affectées</div></div>");
+
+        html.append("</div>");
+
+        // Top 10 librairies vulnérables
+        var topLibs = cveResult.topVulnerableLibraries(10);
+        if (!topLibs.isEmpty()) {
+            html.append("<h3>Librairies les plus vulnérables</h3>");
+            html.append("<table><tr><th>Librairie</th><th>CVE</th><th>Sévérité max</th></tr>");
+
+            for (var entry : topLibs) {
+                String gav = entry.getKey();
+                List<CveInfo> cves = entry.getValue();
+                CveSeverity maxSev = cves.stream()
+                    .map(CveInfo::severity)
+                    .min(Comparator.comparingInt(Enum::ordinal))
+                    .orElse(CveSeverity.NONE);
+
+                html.append("<tr>");
+                html.append("<td><code>").append(gav).append("</code></td>");
+                html.append("<td>").append(cves.size()).append("</td>");
+                html.append("<td><span class='cve-badge cve-").append(maxSev.name().toLowerCase())
+                    .append("'>").append(maxSev.getLabelFr()).append("</span></td>");
+                html.append("</tr>");
+            }
+            html.append("</table>");
+        }
+
+        // Tableau détaillé des CVE
+        html.append("<h3>Détail des vulnérabilités</h3>");
+        html.append("<table><tr><th>CVE</th><th>Score</th><th>Sévérité</th><th>Librairie</th><th>Description</th></tr>");
+
+        // Trier par score décroissant
+        List<CveInfo> sortedCves = cveResult.vulnerabilities().stream()
+            .sorted((a, b) -> Double.compare(b.cvssScore(), a.cvssScore()))
+            .toList();
+
+        for (CveInfo cve : sortedCves) {
+            String sevClass = "cve-" + cve.severity().name().toLowerCase();
+
+            html.append("<tr>");
+            html.append("<td><a href='").append(cve.nvdUrl()).append("' target='_blank'>")
+                .append(cve.cveId()).append("</a></td>");
+            html.append("<td><span class='cve-badge ").append(sevClass).append("'>")
+                .append(String.format("%.1f", cve.cvssScore())).append("</span></td>");
+            html.append("<td><span class='cve-badge ").append(sevClass).append("'>")
+                .append(cve.severity().getLabelFr()).append("</span></td>");
+            html.append("<td><code>").append(cve.libraryName()).append("</code></td>");
+
+            // Tronquer la description
+            String desc = cve.description();
+            if (desc.length() > 150) {
+                desc = desc.substring(0, 147) + "...";
+            }
+            html.append("<td>").append(desc).append("</td>");
+            html.append("</tr>");
+        }
+
+        html.append("</table>");
+
+        // Message d'avertissement si critiques
+        if (cveResult.hasCriticalVulnerabilities()) {
+            html.append("<div class='conflict-warning' style='background-color: #fef2f2; border-left: 4px solid #dc2626;'>");
+            html.append("<strong>🛑 ATTENTION :</strong> Ce projet contient des vulnérabilités CRITIQUES. ");
+            html.append("Il est fortement recommandé de mettre à jour les bibliothèques concernées avant la mise en production.");
+            html.append("</div>");
+        }
     }
 }

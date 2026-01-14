@@ -7,6 +7,8 @@ import fr.cnam.migration.model.*;
 import fr.cnam.migration.analyzer.JarPackageAnalyzer;
 import fr.cnam.migration.autofix.model.AutoFixResult;
 import fr.cnam.migration.autofix.model.ProvidedDependency;
+import fr.cnam.migration.model.CveAnalysisResult;
+import fr.cnam.migration.model.CveInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -79,15 +81,23 @@ public class ReportUiClient {
      * Soumet un rapport de migration au serveur ReportUI.
      */
     public void submitReport(ProjectStructure project, AnalysisResult analysis) {
-        submitReport(project, analysis, null);
+        submitReport(project, analysis, null, null);
     }
 
     /**
      * Soumet un rapport de migration au serveur ReportUI avec les librairies provided.
      */
     public void submitReport(ProjectStructure project, AnalysisResult analysis, AutoFixResult autoFixResult) {
+        submitReport(project, analysis, autoFixResult, null);
+    }
+
+    /**
+     * Soumet un rapport de migration avec analyse CVE.
+     */
+    public void submitReport(ProjectStructure project, AnalysisResult analysis,
+                            AutoFixResult autoFixResult, CveAnalysisResult cveResult) {
         try {
-            Map<String, Object> request = buildRequest(project, analysis, autoFixResult);
+            Map<String, Object> request = buildRequest(project, analysis, autoFixResult, cveResult);
             String jsonBody = objectMapper.writeValueAsString(request);
 
             HttpRequest httpRequest = HttpRequest.newBuilder()
@@ -118,7 +128,8 @@ public class ReportUiClient {
     /**
      * Construit la requête de création de rapport à partir des modèles ant2maven.
      */
-    private Map<String, Object> buildRequest(ProjectStructure project, AnalysisResult analysis, AutoFixResult autoFixResult) {
+    private Map<String, Object> buildRequest(ProjectStructure project, AnalysisResult analysis,
+                                             AutoFixResult autoFixResult, CveAnalysisResult cveResult) {
         Map<String, Object> request = new LinkedHashMap<>();
         request.put("projectName", project.name());
         request.put("migrationDate", LocalDateTime.now().toString());
@@ -127,7 +138,60 @@ public class ReportUiClient {
         request.put("detectedJars", buildDetectedJars(project));
         request.put("missingPackages", buildMissingPackages(autoFixResult));
         request.put("compilationSuccess", autoFixResult == null || autoFixResult.isSuccess());
+
+        // Données CVE
+        if (cveResult != null && cveResult.analysisPerformed()) {
+            request.put("cveVulnerabilities", buildCveVulnerabilities(cveResult));
+            request.put("cveSummary", buildCveSummary(cveResult));
+        }
+
         return request;
+    }
+
+    /**
+     * Construit la liste des vulnérabilités CVE.
+     */
+    private List<Map<String, Object>> buildCveVulnerabilities(CveAnalysisResult cveResult) {
+        List<Map<String, Object>> cves = new ArrayList<>();
+        for (CveInfo cve : cveResult.vulnerabilities()) {
+            Map<String, Object> cveData = new LinkedHashMap<>();
+            cveData.put("cveId", cve.cveId());
+            cveData.put("cvssScore", cve.cvssScore());
+            cveData.put("severity", cve.severity().name());
+            cveData.put("severityColor", cve.severity().getColor());
+            cveData.put("description", cve.description());
+            cveData.put("libraryName", cve.libraryName());
+            cveData.put("gav", cve.gav());
+            cveData.put("cweId", cve.cweId());
+            cveData.put("reference", cve.primaryReference());
+            cves.add(cveData);
+        }
+        return cves;
+    }
+
+    /**
+     * Construit le résumé des vulnérabilités CVE.
+     */
+    private Map<String, Object> buildCveSummary(CveAnalysisResult cveResult) {
+        Map<String, Object> summary = new LinkedHashMap<>();
+        summary.put("totalVulnerabilities", cveResult.totalCount());
+        summary.put("criticalCount", cveResult.criticalCount());
+        summary.put("highCount", cveResult.highCount());
+        summary.put("mediumCount", cveResult.mediumCount());
+        summary.put("lowCount", cveResult.lowCount());
+        summary.put("maxSeverity", cveResult.maxSeverity().name());
+        summary.put("maxSeverityColor", cveResult.maxSeverity().getColor());
+        summary.put("riskScore", cveResult.riskScore());
+        summary.put("affectedLibraries", cveResult.byLibrary().size());
+
+        // Top librairies vulnérables
+        Map<String, Integer> topLibs = new LinkedHashMap<>();
+        for (var entry : cveResult.topVulnerableLibraries(5)) {
+            topLibs.put(entry.getKey(), entry.getValue().size());
+        }
+        summary.put("topVulnerableLibraries", topLibs);
+
+        return summary;
     }
 
     /**

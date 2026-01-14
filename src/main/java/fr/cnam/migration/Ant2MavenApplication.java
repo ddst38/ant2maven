@@ -6,8 +6,10 @@ import fr.cnam.migration.autofix.model.AutoFixResult;
 import fr.cnam.migration.config.MigrationConfig;
 import fr.cnam.migration.config.MigrationConfig.DeploymentMode;
 import fr.cnam.migration.config.MigrationConfig.RemoteTarget;
+import fr.cnam.migration.cve.CveAnalyzer;
 import fr.cnam.migration.generator.ProjectGenerator;
 import fr.cnam.migration.model.AnalysisResult;
+import fr.cnam.migration.model.CveAnalysisResult;
 import fr.cnam.migration.model.ProjectStructure;
 import fr.cnam.migration.report.ReportGenerator;
 import fr.cnam.migration.report.ReportUiClient;
@@ -213,6 +215,20 @@ public class Ant2MavenApplication implements Callable<Integer> {
         defaultValue = "java-dette"
     )
     private String deployRepository;
+
+    // === Options Analyse CVE ===
+
+    @Option(
+        names = {"--cve-check"},
+        description = "Execute l'analyse CVE via OWASP Dependency-Check apres compilation"
+    )
+    private boolean cveCheck;
+
+    @Option(
+        names = {"--nvd-api-key"},
+        description = "Cle API NVD pour accelerer les analyses CVE (ou variable NVD_API_KEY)"
+    )
+    private String nvdApiKey;
 
     @Override
     public Integer call() {
@@ -435,13 +451,32 @@ public class Ant2MavenApplication implements Callable<Integer> {
                 log.info("Exécutez-le manuellement après avoir vérifié la compilation.");
             }
 
-            // Soumettre le rapport à ReportUI si configuré (après auto-fix pour inclure les provided)
+            // Phase 5 : Analyse CVE (si activée)
+            CveAnalysisResult cveResult = CveAnalysisResult.empty();
+            if (cveCheck || "true".equalsIgnoreCase(System.getenv("CVE_CHECK"))) {
+                // Récupérer la clé API NVD
+                String effectiveNvdApiKey = nvdApiKey;
+                if (effectiveNvdApiKey == null || effectiveNvdApiKey.isBlank()) {
+                    effectiveNvdApiKey = System.getenv("NVD_API_KEY");
+                }
+
+                CveAnalyzer cveAnalyzer = new CveAnalyzer(effectiveNvdApiKey, verbose);
+                cveResult = cveAnalyzer.analyze(result.outputDir());
+
+                // Regénérer le rapport HTML avec les CVE
+                if (cveResult.analysisPerformed()) {
+                    log.info("Mise à jour du rapport HTML avec les résultats CVE...");
+                    reportGenerator.generateMigrationReport(project, analysis, config.outputDir(), fixResult, cveResult);
+                }
+            }
+
+            // Soumettre le rapport à ReportUI si configuré (après auto-fix et CVE pour tout inclure)
             if (reportUiUrl != null && !reportUiUrl.isBlank()) {
                 log.info("");
                 log.info("Submitting report to ReportUI at {}...", reportUiUrl);
                 try {
                     ReportUiClient reportUiClient = new ReportUiClient(reportUiUrl, config.basePackage());
-                    reportUiClient.submitReport(project, analysis, fixResult);
+                    reportUiClient.submitReport(project, analysis, fixResult, cveResult);
                 } catch (Exception e) {
                     log.warn("Failed to submit report to ReportUI: {}", e.getMessage());
                 }
