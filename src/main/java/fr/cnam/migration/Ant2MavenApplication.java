@@ -3,6 +3,7 @@ package fr.cnam.migration;
 import fr.cnam.migration.analyzer.DependencyAnalyzer;
 import fr.cnam.migration.autofix.AutoFixService;
 import fr.cnam.migration.autofix.model.AutoFixResult;
+import fr.cnam.migration.cadre.CadrePackageDownloader;
 import fr.cnam.migration.config.MigrationConfig;
 import fr.cnam.migration.config.MigrationConfig.DeploymentMode;
 import fr.cnam.migration.config.MigrationConfig.RemoteTarget;
@@ -16,6 +17,7 @@ import fr.cnam.migration.model.ProjectStructure;
 import fr.cnam.migration.report.ReportGenerator;
 import fr.cnam.migration.report.ReportUiClient;
 import fr.cnam.migration.scanner.ProjectScanner;
+import fr.cnam.migration.scanner.PropertiesConfParser;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
@@ -234,6 +236,14 @@ public class Ant2MavenApplication implements Callable<Integer> {
     )
     private String nvdApiKey;
 
+    // === Option Scan Cadre ===
+
+    @Option(
+        names = {"--scan-cadre"},
+        description = "Telecharge les dependances cadre depuis [DEPENDANCES_FAB] avant le scan"
+    )
+    private boolean scanCadre;
+
     @Override
     public Integer call() {
         try {
@@ -318,6 +328,44 @@ public class Ant2MavenApplication implements Callable<Integer> {
 
             if (config.isRemoteDeployment()) {
                 log.info("Remote target: {}", config.remoteTarget());
+            }
+
+            // Phase 0 : Scan Cadre (telecharger les dependances [DEPENDANCES_FAB])
+            if (scanCadre && (config.isArtifactoryConfigured() || config.isNexusConfigured())) {
+                log.info("");
+                log.info("Phase 0: Scanning cadre dependencies...");
+
+                PropertiesConfParser ciParser = new PropertiesConfParser();
+                List<String> tags = ciParser.extractTags(config.projectRoot());
+
+                if (!tags.isEmpty()) {
+                    log.info("Found {} cadre dependencies in CI file", tags.size());
+
+                    // Creer le repertoire libcadre dans le projet SOURCE (pas destination)
+                    // pour que les JARs soient analyses par le scanner
+                    Path libcadreDir = config.projectRoot().resolve("libcadre");
+                    java.nio.file.Files.createDirectories(libcadreDir);
+                    log.info("Cadre libraries will be extracted to: {}", libcadreDir);
+
+                    CadrePackageDownloader downloader = new CadrePackageDownloader(config);
+                    int totalJars = 0;
+                    int successTags = 0;
+
+                    for (String tag : tags) {
+                        int jars = downloader.downloadAndExtract(tag, libcadreDir);
+                        if (jars > 0) {
+                            totalJars += jars;
+                            successTags++;
+                        }
+                    }
+
+                    log.info("Cadre scan complete: {} JARs extracted from {}/{} packages",
+                        totalJars, successTags, tags.size());
+                } else {
+                    log.info("No cadre dependencies found in CI file");
+                }
+            } else if (scanCadre) {
+                log.warn("--scan-cadre requires Artifactory or Nexus to be configured");
             }
 
             // Phase 1 : Scanner la structure du projet

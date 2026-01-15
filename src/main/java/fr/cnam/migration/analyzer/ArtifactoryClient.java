@@ -2,6 +2,7 @@ package fr.cnam.migration.analyzer;
 
 import fr.cnam.migration.config.MigrationConfig;
 import fr.cnam.migration.model.MavenCoordinate;
+import fr.cnam.migration.model.ResolutionResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -42,6 +43,7 @@ public class ArtifactoryClient {
     private final MigrationConfig config;
     private final HttpClient httpClient;
     private final Map<String, Optional<MavenCoordinate>> sha1Cache = new ConcurrentHashMap<>();
+    private final Map<String, Optional<ResolutionResult>> sha1ResultCache = new ConcurrentHashMap<>();
     private final Map<String, Boolean> existsCache = new ConcurrentHashMap<>();
 
     public ArtifactoryClient(MigrationConfig config) {
@@ -135,6 +137,46 @@ public class ArtifactoryClient {
         }
 
         return sha1Cache.computeIfAbsent(sha1, this::doSearchBySha1);
+    }
+
+    /**
+     * Recherche un artefact par checksum SHA-1 et retourne aussi le repository source.
+     */
+    public Optional<ResolutionResult> searchBySha1WithResult(String sha1) {
+        if (!config.isArtifactoryConfigured() || sha1 == null || sha1.isBlank()) {
+            return Optional.empty();
+        }
+
+        return sha1ResultCache.computeIfAbsent(sha1, this::doSearchBySha1WithResult);
+    }
+
+    private Optional<ResolutionResult> doSearchBySha1WithResult(String sha1) {
+        try {
+            String url = config.artifactoryUrl() + "/api/search/checksum?sha1=" + sha1;
+
+            HttpRequest.Builder requestBuilder = HttpRequest.newBuilder()
+                .uri(URI.create(url))
+                .timeout(Duration.ofSeconds(30))
+                .GET();
+
+            addAuthHeaders(requestBuilder);
+
+            HttpRequest request = requestBuilder.build();
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+
+            if (response.statusCode() == 200) {
+                return parseSearchResponseWithRepo(response.body());
+            } else if (response.statusCode() == 404) {
+                return Optional.empty();
+            } else {
+                log.warn("Artifactory search failed with status {}: {}", response.statusCode(), response.body());
+            }
+
+        } catch (Exception e) {
+            log.debug("Artifactory search error for SHA1 {}: {}", sha1, e.getMessage());
+        }
+
+        return Optional.empty();
     }
 
     private Optional<MavenCoordinate> doSearchBySha1(String sha1) {
@@ -321,6 +363,44 @@ public class ArtifactoryClient {
         }
 
         return Optional.empty();
+    }
+
+    /**
+     * Parse la réponse de recherche et extrait les coordonnées Maven ainsi que le repository.
+     */
+    private Optional<ResolutionResult> parseSearchResponseWithRepo(String json) {
+        // Format de réponse : {"results":[{"uri":"...","downloadUri":"...","repo":"..."}]}
+        Pattern uriPattern = Pattern.compile("\"downloadUri\"\\s*:\\s*\"([^\"]+)\"");
+        Pattern repoPattern = Pattern.compile("\"repo\"\\s*:\\s*\"([^\"]+)\"");
+
+        Matcher uriMatcher = uriPattern.matcher(json);
+        Matcher repoMatcher = repoPattern.matcher(json);
+
+        if (uriMatcher.find()) {
+            String downloadUri = uriMatcher.group(1);
+            String repository = repoMatcher.find() ? repoMatcher.group(1) : extractRepoFromPath(downloadUri);
+
+            Optional<MavenCoordinate> coord = parseCoordinatesFromPath(downloadUri);
+            if (coord.isPresent()) {
+                return Optional.of(ResolutionResult.of(coord.get(), repository));
+            }
+        }
+
+        return Optional.empty();
+    }
+
+    /**
+     * Extrait le nom du repository depuis le path de téléchargement.
+     */
+    private String extractRepoFromPath(String downloadUri) {
+        // Format: http://artifactory/artifactory/repo-name/group/artifact/version/file.jar
+        String[] parts = downloadUri.split("/");
+        for (int i = 0; i < parts.length; i++) {
+            if (parts[i].equals("artifactory") && i + 1 < parts.length) {
+                return parts[i + 1];
+            }
+        }
+        return null;
     }
 
     /**

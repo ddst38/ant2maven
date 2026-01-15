@@ -66,6 +66,13 @@
             <version>${commons-csv.version}</version>
         </dependency>
 
+        <!-- Compression (tar.gz extraction) -->
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-compress</artifactId>
+            <version>1.26.0</version>
+        </dependency>
+
         <!-- Logging -->
         <dependency>
             <groupId>org.slf4j</groupId>

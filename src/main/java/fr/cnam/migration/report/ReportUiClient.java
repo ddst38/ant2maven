@@ -277,11 +277,49 @@ public class ReportUiClient {
             Map<String, Object> jarData = new LinkedHashMap<>();
             jarData.put("name", jar.name());
             jarData.put("size", jar.size());
-            jarData.put("source", jar.sourceEar() != null ? "Extrait de " + jar.sourceEar() : "Répertoire lib");
+
+            // Detecter si le JAR provient de libcadre et extraire le tag
+            String cadreTag = extractCadreTag(jar.path());
+            if (cadreTag != null) {
+                jarData.put("source", "Cadre");
+                jarData.put("cadreTag", cadreTag);
+            } else if (jar.sourceEar() != null) {
+                jarData.put("source", "Extrait de " + jar.sourceEar());
+                jarData.put("cadreTag", null);
+            } else {
+                jarData.put("source", "Répertoire lib");
+                jarData.put("cadreTag", null);
+            }
+
             jarData.put("category", jar.category() != null ? jar.category().name() : "UNKNOWN");
             jars.add(jarData);
         }
         return jars;
+    }
+
+    /**
+     * Extrait le tag du cadre depuis le chemin du JAR si celui-ci provient de libcadre.
+     * Exemple: /path/to/project/libcadre/PRF1190208A/lib.jar -> PRF1190208A
+     */
+    private String extractCadreTag(java.nio.file.Path jarPath) {
+        if (jarPath == null) {
+            return null;
+        }
+
+        String pathStr = jarPath.toString().replace('\\', '/');
+        int libcadreIdx = pathStr.indexOf("/libcadre/");
+        if (libcadreIdx == -1) {
+            return null;
+        }
+
+        // Extraire la partie apres /libcadre/
+        String afterLibcadre = pathStr.substring(libcadreIdx + "/libcadre/".length());
+        // Le tag est le premier segment du chemin
+        int slashIdx = afterLibcadre.indexOf('/');
+        if (slashIdx > 0) {
+            return afterLibcadre.substring(0, slashIdx);
+        }
+        return null;
     }
 
     /**
@@ -404,6 +442,9 @@ public class ReportUiClient {
             byMethod.put("AUTO_FIX", providedCount);
         }
 
+        // Par localisation (source du repository)
+        Map<String, Integer> byLocation = buildByLocation(analysis);
+
         Map<String, Object> stats = new LinkedHashMap<>();
         stats.put("totalJars", totalDetected + providedCount);
         stats.put("resolved", resolvedCount + providedCount);
@@ -416,7 +457,50 @@ public class ReportUiClient {
         stats.put("coverageRate", Math.round(coverageRate * 10.0) / 10.0);
         stats.put("byScope", byScope);
         stats.put("byMethod", byMethod);
+        stats.put("byLocation", byLocation);
         return stats;
+    }
+
+    /**
+     * Construit la répartition par localisation (source du repository).
+     * Catégories:
+     * - MAVEN_CENTRAL: Librairies trouvées sur Maven Central
+     * - INTERNAL_REPO: Librairies trouvées sur Artifactory/Nexus (repos internes)
+     * - DEBT_REPO: Librairies trouvées sur le repo de dette technique (migration-java-dette)
+     * - LOCAL: Librairies nécessitant une installation locale
+     */
+    private Map<String, Integer> buildByLocation(AnalysisResult analysis) {
+        Map<String, Integer> byLocation = new LinkedHashMap<>();
+        int mavenCentral = 0;
+        int internalRepo = 0;
+        int debtRepo = 0;
+        int local = 0;
+
+        for (DependencyInfo dep : analysis.resolved()) {
+            if (dep.needsLocalInstall()) {
+                local++;
+            } else if (dep.isFromMavenCentral()) {
+                mavenCentral++;
+            } else if (dep.isFromDebtRepository()) {
+                debtRepo++;
+            } else if (dep.isResolvedOnRemoteRepository()) {
+                // Artifactory ou Nexus (hors dette)
+                internalRepo++;
+            } else {
+                // Autres cas (pattern, known config)
+                local++;
+            }
+        }
+
+        // Ajouter aussi les non résolus
+        local += analysis.unresolved().size();
+
+        byLocation.put("MAVEN_CENTRAL", mavenCentral);
+        byLocation.put("INTERNAL_REPO", internalRepo);
+        byLocation.put("DEBT_REPO", debtRepo);
+        byLocation.put("LOCAL", local);
+
+        return byLocation;
     }
 
     /**
@@ -452,6 +536,8 @@ public class ReportUiClient {
             lib.put("libraryType", isInternal ? "internal" : "external");
             lib.put("isAutoFixProvided", false);
             lib.put("isLocalInstall", needsLocal);
+            lib.put("sourceRepository", dep.sourceRepository());
+            lib.put("isFromDebtRepo", dep.isFromDebtRepository());
 
             libraries.add(lib);
         }
@@ -492,6 +578,8 @@ public class ReportUiClient {
             lib.put("libraryType", isInternal ? "internal" : "external");
             lib.put("isAutoFixProvided", false);
             lib.put("isLocalInstall", true);
+            lib.put("sourceRepository", null);
+            lib.put("isFromDebtRepo", false);
 
             libraries.add(lib);
         }
@@ -525,6 +613,8 @@ public class ReportUiClient {
                 lib.put("libraryType", isInternal ? "internal" : "external");
                 lib.put("isAutoFixProvided", true);
                 lib.put("isLocalInstall", true);
+                lib.put("sourceRepository", null);
+                lib.put("isFromDebtRepo", false);
 
                 libraries.add(lib);
             }

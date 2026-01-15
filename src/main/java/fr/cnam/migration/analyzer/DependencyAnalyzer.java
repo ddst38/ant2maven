@@ -89,7 +89,8 @@ public class DependencyAnalyzer {
                     ctx.coordinate(),
                     scope,
                     ctx.method(),
-                    jar
+                    jar,
+                    ctx.sourceRepository()
                 ));
             } else {
                 unresolved.add(new AnalysisResult.UnresolvedJar(jar, ctx.attempts()));
@@ -148,15 +149,18 @@ public class DependencyAnalyzer {
 
         // Stratégie 2 : Recherche Artifactory par SHA1
         if (config.isArtifactoryConfigured() && jar.sha1() != null) {
-            Optional<MavenCoordinate> fromArtifactory = artifactoryClient.searchBySha1(jar.sha1());
+            Optional<ResolutionResult> fromArtifactory = artifactoryClient.searchBySha1WithResult(jar.sha1());
             if (fromArtifactory.isPresent()) {
-                MavenCoordinate coord = fromArtifactory.get();
+                ResolutionResult result = fromArtifactory.get();
+                MavenCoordinate coord = result.coordinate();
                 attempts.add(AnalysisResult.ResolutionAttempt.success(
                     ResolutionMethod.ARTIFACTORY_CHECKSUM, coord));
-                log.debug("Resolved from Artifactory by SHA1: {} -> {}", jar.name(), coord.toGav());
+                log.debug("Resolved from Artifactory by SHA1: {} -> {} (repo: {})",
+                    jar.name(), coord.toGav(), result.sourceRepository());
                 // Enregistrer dans known-artifacts.yaml pour les prochaines exécutions
                 knownArtifacts.addEntry(jar.sha1(), coord, jar.originalName());
-                return ResolutionContext.resolved(coord, ResolutionMethod.ARTIFACTORY_CHECKSUM, attempts);
+                return ResolutionContext.resolved(coord, ResolutionMethod.ARTIFACTORY_CHECKSUM,
+                    result.sourceRepository(), attempts);
             }
             attempts.add(AnalysisResult.ResolutionAttempt.failed(
                 ResolutionMethod.ARTIFACTORY_CHECKSUM, "Not found on Artifactory"));
@@ -164,15 +168,18 @@ public class DependencyAnalyzer {
 
         // Stratégie 2b : Recherche Nexus par SHA1
         if (config.isNexusConfigured() && jar.sha1() != null) {
-            Optional<MavenCoordinate> fromNexus = nexusClient.searchBySha1(jar.sha1());
+            Optional<ResolutionResult> fromNexus = nexusClient.searchBySha1WithResult(jar.sha1());
             if (fromNexus.isPresent()) {
-                MavenCoordinate coord = fromNexus.get();
+                ResolutionResult result = fromNexus.get();
+                MavenCoordinate coord = result.coordinate();
                 attempts.add(AnalysisResult.ResolutionAttempt.success(
                     ResolutionMethod.NEXUS_CHECKSUM, coord));
-                log.debug("Resolved from Nexus by SHA1: {} -> {}", jar.name(), coord.toGav());
+                log.debug("Resolved from Nexus by SHA1: {} -> {} (repo: {})",
+                    jar.name(), coord.toGav(), result.sourceRepository());
                 // Enregistrer dans known-artifacts.yaml pour les prochaines exécutions
                 knownArtifacts.addEntry(jar.sha1(), coord, jar.originalName());
-                return ResolutionContext.resolved(coord, ResolutionMethod.NEXUS_CHECKSUM, attempts);
+                return ResolutionContext.resolved(coord, ResolutionMethod.NEXUS_CHECKSUM,
+                    result.sourceRepository(), attempts);
             }
             attempts.add(AnalysisResult.ResolutionAttempt.failed(
                 ResolutionMethod.NEXUS_CHECKSUM, "Not found on Nexus"));
@@ -188,7 +195,7 @@ public class DependencyAnalyzer {
                 log.debug("Resolved by SHA1 on Maven Central: {} -> {}", jar.name(), coord.toGav());
                 // Enregistrer dans known-artifacts.yaml pour les prochaines exécutions
                 knownArtifacts.addEntry(jar.sha1(), coord, jar.originalName());
-                return ResolutionContext.resolved(coord, ResolutionMethod.CHECKSUM, attempts);
+                return ResolutionContext.resolved(coord, ResolutionMethod.CHECKSUM, "Maven Central", attempts);
             }
             attempts.add(AnalysisResult.ResolutionAttempt.failed(
                 ResolutionMethod.CHECKSUM, "Not found on Maven Central"));
@@ -345,15 +352,22 @@ public class DependencyAnalyzer {
         boolean isResolved,
         MavenCoordinate coordinate,
         ResolutionMethod method,
+        String sourceRepository,
         List<AnalysisResult.ResolutionAttempt> attempts
     ) {
         static ResolutionContext resolved(MavenCoordinate coord, ResolutionMethod method,
                                          List<AnalysisResult.ResolutionAttempt> attempts) {
-            return new ResolutionContext(true, coord, method, attempts);
+            return new ResolutionContext(true, coord, method, null, attempts);
+        }
+
+        static ResolutionContext resolved(MavenCoordinate coord, ResolutionMethod method,
+                                         String sourceRepository,
+                                         List<AnalysisResult.ResolutionAttempt> attempts) {
+            return new ResolutionContext(true, coord, method, sourceRepository, attempts);
         }
 
         static ResolutionContext unresolved(List<AnalysisResult.ResolutionAttempt> attempts) {
-            return new ResolutionContext(false, null, ResolutionMethod.UNRESOLVED, attempts);
+            return new ResolutionContext(false, null, ResolutionMethod.UNRESOLVED, null, attempts);
         }
     }
 }

@@ -12,8 +12,16 @@ public record DependencyInfo(
     MavenCoordinate coordinate,
     Scope scope,
     ResolutionMethod method,
-    JarInfo sourceJar
+    JarInfo sourceJar,
+    String sourceRepository
 ) {
+    /**
+     * Constructeur sans sourceRepository pour compatibilité.
+     */
+    public DependencyInfo(MavenCoordinate coordinate, Scope scope, ResolutionMethod method, JarInfo sourceJar) {
+        this(coordinate, scope, method, sourceJar, null);
+    }
+
     /**
      * Vérifie si cette dépendance est interne (artefact propriétaire CNAM).
      * Une dépendance est interne si son groupId commence par fr.cnamts ou fr.cnam.
@@ -55,6 +63,21 @@ public record DependencyInfo(
                method == ResolutionMethod.ARTIFACTORY ||
                method == ResolutionMethod.ARTIFACTORY_CHECKSUM ||
                method == ResolutionMethod.CHECKSUM;
+    }
+
+    /**
+     * Vérifie si cette dépendance provient du repository de dette technique.
+     */
+    public boolean isFromDebtRepository() {
+        return sourceRepository != null &&
+               sourceRepository.toLowerCase().contains("migration-java-dette");
+    }
+
+    /**
+     * Vérifie si cette dépendance provient de Maven Central.
+     */
+    public boolean isFromMavenCentral() {
+        return method == ResolutionMethod.CHECKSUM;
     }
 
     public String groupId() {

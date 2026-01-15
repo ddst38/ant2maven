@@ -2,6 +2,7 @@ package fr.cnam.migration.analyzer;
 
 import fr.cnam.migration.config.MigrationConfig;
 import fr.cnam.migration.model.MavenCoordinate;
+import fr.cnam.migration.model.ResolutionResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -40,6 +41,7 @@ public class NexusClient {
     private final MigrationConfig config;
     private final HttpClient httpClient;
     private final Map<String, Optional<MavenCoordinate>> sha1Cache = new ConcurrentHashMap<>();
+    private final Map<String, Optional<ResolutionResult>> sha1ResultCache = new ConcurrentHashMap<>();
     private final Map<String, Boolean> existsCache = new ConcurrentHashMap<>();
 
     public NexusClient(MigrationConfig config) {
@@ -184,6 +186,112 @@ public class NexusClient {
         } catch (Exception e) {
             log.debug("[Nexus] Erreur lors de la recherche pour SHA1 {} : {}", sha1, e.getMessage());
             log.trace("[Nexus] Stack trace :", e);
+        }
+
+        return Optional.empty();
+    }
+
+    /**
+     * Recherche un artefact par SHA1 et retourne le résultat avec le repository source.
+     *
+     * @param sha1 Le hash SHA-1 du fichier JAR
+     * @return Optional contenant le résultat avec coordonnées Maven et repository source
+     */
+    public Optional<ResolutionResult> searchBySha1WithResult(String sha1) {
+        if (!config.isNexusConfigured() || sha1 == null || sha1.isBlank()) {
+            log.debug("[Nexus] Recherche ignorée : Nexus non configuré ou SHA1 invalide");
+            return Optional.empty();
+        }
+
+        // Vérifier si déjà en cache
+        if (sha1ResultCache.containsKey(sha1)) {
+            Optional<ResolutionResult> cached = sha1ResultCache.get(sha1);
+            log.debug("[Nexus] Résultat en cache pour SHA1 {} : {}", sha1,
+                cached.map(r -> r.coordinate().toGav() + " from " + r.sourceRepository()).orElse("non trouvé"));
+            return cached;
+        }
+
+        log.debug("[Nexus] Recherche par SHA1 avec repo : {}", sha1);
+        return sha1ResultCache.computeIfAbsent(sha1, this::doSearchBySha1WithResult);
+    }
+
+    private Optional<ResolutionResult> doSearchBySha1WithResult(String sha1) {
+        try {
+            String url = config.nexusUrl() + "/service/rest/v1/search/assets?sha1=" + sha1;
+            log.debug("[Nexus] Appel API : {}", url);
+
+            HttpRequest.Builder requestBuilder = HttpRequest.newBuilder()
+                .uri(URI.create(url))
+                .timeout(Duration.ofSeconds(30))
+                .GET();
+
+            addAuthHeaders(requestBuilder);
+
+            HttpRequest request = requestBuilder.build();
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+
+            log.debug("[Nexus] Réponse HTTP : {} pour SHA1 {}", response.statusCode(), sha1);
+
+            if (response.statusCode() == 200) {
+                Optional<ResolutionResult> result = parseSearchResponseWithRepo(response.body());
+                if (result.isPresent()) {
+                    log.debug("[Nexus] Artefact trouvé pour SHA1 {} : {} (repo: {})",
+                        sha1, result.get().coordinate().toGav(), result.get().sourceRepository());
+                } else {
+                    log.debug("[Nexus] Réponse 200 mais aucun artefact trouvé pour SHA1 {}", sha1);
+                }
+                return result;
+            } else if (response.statusCode() == 404) {
+                log.debug("[Nexus] Artefact non trouvé (404) pour SHA1 {}", sha1);
+                return Optional.empty();
+            } else {
+                log.warn("[Nexus] Échec recherche avec statut {} pour SHA1 {}", response.statusCode(), sha1);
+            }
+
+        } catch (Exception e) {
+            log.debug("[Nexus] Erreur lors de la recherche pour SHA1 {} : {}", sha1, e.getMessage());
+        }
+
+        return Optional.empty();
+    }
+
+    /**
+     * Parse la réponse de recherche Nexus pour extraire les coordonnées Maven ET le repository.
+     */
+    private Optional<ResolutionResult> parseSearchResponseWithRepo(String json) {
+        // Extraire le repository
+        Pattern repoPattern = Pattern.compile("\"repository\"\\s*:\\s*\"([^\"]+)\"");
+        Matcher repoMatcher = repoPattern.matcher(json);
+        String repository = repoMatcher.find() ? repoMatcher.group(1) : null;
+
+        // Extraire les coordonnées
+        Pattern groupIdPattern = Pattern.compile("\"groupId\"\\s*:\\s*\"([^\"]+)\"");
+        Pattern artifactIdPattern = Pattern.compile("\"artifactId\"\\s*:\\s*\"([^\"]+)\"");
+        Pattern versionPattern = Pattern.compile("\"version\"\\s*:\\s*\"([^\"]+)\"");
+
+        Matcher groupIdMatcher = groupIdPattern.matcher(json);
+        Matcher artifactIdMatcher = artifactIdPattern.matcher(json);
+        Matcher versionMatcher = versionPattern.matcher(json);
+
+        if (groupIdMatcher.find() && artifactIdMatcher.find() && versionMatcher.find()) {
+            String groupId = groupIdMatcher.group(1);
+            String artifactId = artifactIdMatcher.group(1);
+            String version = versionMatcher.group(1);
+
+            MavenCoordinate coord = new MavenCoordinate(groupId, artifactId, version);
+            return Optional.of(ResolutionResult.of(coord, repository));
+        }
+
+        // Fallback: essayer de parser depuis le path
+        Pattern pathPattern = Pattern.compile("\"path\"\\s*:\\s*\"([^\"]+)\"");
+        Matcher pathMatcher = pathPattern.matcher(json);
+
+        if (pathMatcher.find()) {
+            String path = pathMatcher.group(1);
+            Optional<MavenCoordinate> coord = parseCoordinatesFromPath(path);
+            if (coord.isPresent()) {
+                return Optional.of(ResolutionResult.of(coord.get(), repository));
+            }
         }
 
         return Optional.empty();
