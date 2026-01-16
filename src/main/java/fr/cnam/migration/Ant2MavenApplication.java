@@ -9,6 +9,8 @@ import fr.cnam.migration.jdeps.JdepsAnalyzer;
 import fr.cnam.migration.jdeps.JdepsResult;
 import fr.cnam.migration.sonar.SonarAnalyzer;
 import fr.cnam.migration.sonar.SonarAnalysisResult;
+import fr.cnam.migration.oss.OssIndexAnalyzer;
+import fr.cnam.migration.oss.OssAnalysisResult;
 import fr.cnam.migration.config.MigrationConfig.DeploymentMode;
 import fr.cnam.migration.config.MigrationConfig.RemoteTarget;
 import fr.cnam.migration.cve.CveAnalyzer;
@@ -282,6 +284,14 @@ public class Ant2MavenApplication implements Callable<Integer> {
         description = "Cle du projet SonarQube (defaut: nom du projet)"
     )
     private String sonarProjectKey;
+
+    // === Option Analyse OSS Index ===
+
+    @Option(
+        names = {"--oss-analysis"},
+        description = "Execute l'analyse OSS Index (viabilite dependances) apres Sonar (ou variable OSS_ANALYSIS)"
+    )
+    private boolean ossAnalysis;
 
     @Override
     public Integer call() {
@@ -599,7 +609,18 @@ public class Ant2MavenApplication implements Callable<Integer> {
                 }
             }
 
-            // Soumettre le rapport à ReportUI si configuré (après auto-fix, CVE, jdeps et Sonar pour tout inclure)
+            // Phase 8 : Analyse OSS Index (si activée)
+            OssAnalysisResult ossResult = OssAnalysisResult.empty();
+            if (ossAnalysis || "true".equalsIgnoreCase(System.getenv("OSS_ANALYSIS"))) {
+                if (fixResult == null || fixResult.isSuccess()) {
+                    OssIndexAnalyzer ossAnalyzer = new OssIndexAnalyzer(verbose);
+                    ossResult = ossAnalyzer.analyze(result.outputDir());
+                } else {
+                    log.warn("Analyse OSS Index ignoree : la compilation a echoue");
+                }
+            }
+
+            // Soumettre le rapport à ReportUI si configuré (après auto-fix, CVE, jdeps, Sonar et OSS pour tout inclure)
             if (reportUiUrl != null && !reportUiUrl.isBlank()) {
                 log.info("");
                 log.info("Submitting report to ReportUI at {}...", reportUiUrl);
@@ -610,7 +631,7 @@ public class Ant2MavenApplication implements Callable<Integer> {
                     if (config.isRemoteDeployment()) {
                         deployedLibraries = collectDeployedLibraries(analysis, fixResult, config);
                     }
-                    reportUiClient.submitReport(project, analysis, fixResult, cveResult, jdepsResult, sonarResult, config, deployedLibraries);
+                    reportUiClient.submitReport(project, analysis, fixResult, cveResult, jdepsResult, sonarResult, ossResult, config, deployedLibraries);
                 } catch (Exception e) {
                     log.warn("Failed to submit report to ReportUI: {}", e.getMessage());
                 }

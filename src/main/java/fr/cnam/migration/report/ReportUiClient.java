@@ -121,6 +121,17 @@ public class ReportUiClient {
 
     /**
      * Soumet un rapport de migration complet avec analyse jdeps et Sonar.
+     */
+    public void submitReport(ProjectStructure project, AnalysisResult analysis,
+                            AutoFixResult autoFixResult, CveAnalysisResult cveResult,
+                            fr.cnam.migration.jdeps.JdepsResult jdepsResult,
+                            fr.cnam.migration.sonar.SonarAnalysisResult sonarResult,
+                            MigrationConfig config, List<DeployedLibrary> deployedLibraries) {
+        submitReport(project, analysis, autoFixResult, cveResult, jdepsResult, sonarResult, null, config, deployedLibraries);
+    }
+
+    /**
+     * Soumet un rapport de migration complet avec analyse jdeps, Sonar et OSS Index.
      *
      * @param project Structure du projet
      * @param analysis Résultat de l'analyse des dépendances
@@ -128,6 +139,7 @@ public class ReportUiClient {
      * @param cveResult Résultat de l'analyse CVE (peut être null)
      * @param jdepsResult Résultat de l'analyse jdeps (peut être null)
      * @param sonarResult Résultat de l'analyse SonarQube (peut être null)
+     * @param ossResult Résultat de l'analyse OSS Index (peut être null)
      * @param config Configuration de migration (pour infos de déploiement)
      * @param deployedLibraries Liste des librairies déployées sur le repository distant
      */
@@ -135,10 +147,11 @@ public class ReportUiClient {
                             AutoFixResult autoFixResult, CveAnalysisResult cveResult,
                             fr.cnam.migration.jdeps.JdepsResult jdepsResult,
                             fr.cnam.migration.sonar.SonarAnalysisResult sonarResult,
+                            fr.cnam.migration.oss.OssAnalysisResult ossResult,
                             MigrationConfig config, List<DeployedLibrary> deployedLibraries) {
         try {
             Map<String, Object> request = buildRequest(project, analysis, autoFixResult, cveResult,
-                                                       jdepsResult, sonarResult, config, deployedLibraries);
+                                                       jdepsResult, sonarResult, ossResult, config, deployedLibraries);
             String jsonBody = objectMapper.writeValueAsString(request);
 
             HttpRequest httpRequest = HttpRequest.newBuilder()
@@ -173,6 +186,7 @@ public class ReportUiClient {
                                              AutoFixResult autoFixResult, CveAnalysisResult cveResult,
                                              fr.cnam.migration.jdeps.JdepsResult jdepsResult,
                                              fr.cnam.migration.sonar.SonarAnalysisResult sonarResult,
+                                             fr.cnam.migration.oss.OssAnalysisResult ossResult,
                                              MigrationConfig config, List<DeployedLibrary> deployedLibraries) {
         Map<String, Object> request = new LinkedHashMap<>();
         request.put("projectName", project.name());
@@ -197,6 +211,11 @@ public class ReportUiClient {
         // Données SonarQube
         if (sonarResult != null && sonarResult.analysisPerformed()) {
             request.put("sonarAnalysis", buildSonarAnalysis(sonarResult));
+        }
+
+        // Données OSS Index (viabilité)
+        if (ossResult != null && ossResult.analysisPerformed()) {
+            request.put("ossAnalysis", buildOssAnalysis(ossResult));
         }
 
         // Informations de déploiement (mode REMOTE uniquement)
@@ -339,6 +358,71 @@ public class ReportUiClient {
         // Totaux
         analysis.put("totalIssues", sonarResult.totalIssues());
         analysis.put("criticalIssuesCount", sonarResult.criticalIssuesCount());
+
+        return analysis;
+    }
+
+    /**
+     * Construit les données d'analyse OSS Index (viabilité) pour le rapport.
+     */
+    private Map<String, Object> buildOssAnalysis(fr.cnam.migration.oss.OssAnalysisResult ossResult) {
+        Map<String, Object> analysis = new LinkedHashMap<>();
+
+        // Résumé global
+        analysis.put("analysisDate", ossResult.analysisDate() != null ? ossResult.analysisDate().toString() : null);
+        analysis.put("totalDependencies", ossResult.totalDependencies());
+        analysis.put("overallHealthScore", ossResult.overallHealthScore());
+        analysis.put("overallStatus", ossResult.overallStatus());
+        analysis.put("healthyPercentage", ossResult.healthyPercentage());
+
+        // Distribution par statut
+        analysis.put("healthDistribution", ossResult.healthDistribution());
+
+        // Compteurs
+        analysis.put("outdatedCount", ossResult.outdatedCount());
+        analysis.put("vulnerableCount", ossResult.vulnerableCount());
+        analysis.put("staleCount", ossResult.staleCount());
+
+        // Alertes critiques
+        List<Map<String, Object>> alerts = new ArrayList<>();
+        for (var dep : ossResult.criticalAlerts()) {
+            Map<String, Object> alertData = new LinkedHashMap<>();
+            alertData.put("groupId", dep.groupId());
+            alertData.put("artifactId", dep.artifactId());
+            alertData.put("currentVersion", dep.currentVersion());
+            alertData.put("latestVersion", dep.latestVersion());
+            alertData.put("healthScore", dep.healthScore());
+            alertData.put("healthStatus", dep.healthStatus());
+            alertData.put("majorVersionsBehind", dep.majorVersionsBehind());
+            alertData.put("minorVersionsBehind", dep.minorVersionsBehind());
+            alertData.put("totalVulnerabilities", dep.totalVulnerabilities());
+            alerts.add(alertData);
+        }
+        analysis.put("criticalAlerts", alerts);
+
+        // Toutes les dépendances
+        List<Map<String, Object>> dependencies = new ArrayList<>();
+        for (var dep : ossResult.dependencies()) {
+            Map<String, Object> depData = new LinkedHashMap<>();
+            depData.put("groupId", dep.groupId());
+            depData.put("artifactId", dep.artifactId());
+            depData.put("currentVersion", dep.currentVersion());
+            depData.put("latestVersion", dep.latestVersion());
+            depData.put("releaseAgeMonths", dep.releaseAgeMonths());
+            depData.put("majorVersionsBehind", dep.majorVersionsBehind());
+            depData.put("minorVersionsBehind", dep.minorVersionsBehind());
+            depData.put("patchVersionsBehind", dep.patchVersionsBehind());
+            depData.put("criticalVulns", dep.criticalVulns());
+            depData.put("highVulns", dep.highVulns());
+            depData.put("mediumVulns", dep.mediumVulns());
+            depData.put("lowVulns", dep.lowVulns());
+            depData.put("totalVulnerabilities", dep.totalVulnerabilities());
+            depData.put("healthScore", dep.healthScore());
+            depData.put("healthStatus", dep.healthStatus());
+            depData.put("hasUpdate", dep.hasUpdate());
+            dependencies.add(depData);
+        }
+        analysis.put("dependencies", dependencies);
 
         return analysis;
     }
