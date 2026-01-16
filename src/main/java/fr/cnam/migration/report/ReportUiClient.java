@@ -97,25 +97,36 @@ public class ReportUiClient {
      */
     public void submitReport(ProjectStructure project, AnalysisResult analysis,
                             AutoFixResult autoFixResult, CveAnalysisResult cveResult) {
-        submitReport(project, analysis, autoFixResult, cveResult, null, null);
+        submitReport(project, analysis, autoFixResult, cveResult, null, null, null);
     }
 
     /**
      * Soumet un rapport de migration complet avec informations de déploiement.
+     */
+    public void submitReport(ProjectStructure project, AnalysisResult analysis,
+                            AutoFixResult autoFixResult, CveAnalysisResult cveResult,
+                            MigrationConfig config, List<DeployedLibrary> deployedLibraries) {
+        submitReport(project, analysis, autoFixResult, cveResult, null, config, deployedLibraries);
+    }
+
+    /**
+     * Soumet un rapport de migration complet avec analyse jdeps.
      *
      * @param project Structure du projet
      * @param analysis Résultat de l'analyse des dépendances
      * @param autoFixResult Résultat de l'auto-fix (peut être null)
      * @param cveResult Résultat de l'analyse CVE (peut être null)
+     * @param jdepsResult Résultat de l'analyse jdeps (peut être null)
      * @param config Configuration de migration (pour infos de déploiement)
      * @param deployedLibraries Liste des librairies déployées sur le repository distant
      */
     public void submitReport(ProjectStructure project, AnalysisResult analysis,
                             AutoFixResult autoFixResult, CveAnalysisResult cveResult,
+                            fr.cnam.migration.jdeps.JdepsResult jdepsResult,
                             MigrationConfig config, List<DeployedLibrary> deployedLibraries) {
         try {
             Map<String, Object> request = buildRequest(project, analysis, autoFixResult, cveResult,
-                                                       config, deployedLibraries);
+                                                       jdepsResult, config, deployedLibraries);
             String jsonBody = objectMapper.writeValueAsString(request);
 
             HttpRequest httpRequest = HttpRequest.newBuilder()
@@ -148,6 +159,7 @@ public class ReportUiClient {
      */
     private Map<String, Object> buildRequest(ProjectStructure project, AnalysisResult analysis,
                                              AutoFixResult autoFixResult, CveAnalysisResult cveResult,
+                                             fr.cnam.migration.jdeps.JdepsResult jdepsResult,
                                              MigrationConfig config, List<DeployedLibrary> deployedLibraries) {
         Map<String, Object> request = new LinkedHashMap<>();
         request.put("projectName", project.name());
@@ -164,12 +176,89 @@ public class ReportUiClient {
             request.put("cveSummary", buildCveSummary(cveResult));
         }
 
+        // Données jdeps
+        if (jdepsResult != null && jdepsResult.analysisPerformed()) {
+            request.put("jdepsAnalysis", buildJdepsAnalysis(jdepsResult));
+        }
+
         // Informations de déploiement (mode REMOTE uniquement)
         if (config != null && config.isRemoteDeployment() && deployedLibraries != null && !deployedLibraries.isEmpty()) {
             request.put("deploymentInfo", buildDeploymentInfo(config, deployedLibraries));
         }
 
         return request;
+    }
+
+    /**
+     * Construit les données d'analyse jdeps pour le rapport.
+     */
+    private Map<String, Object> buildJdepsAnalysis(fr.cnam.migration.jdeps.JdepsResult jdepsResult) {
+        Map<String, Object> analysis = new LinkedHashMap<>();
+
+        // Résumé
+        Map<String, Object> summary = new LinkedHashMap<>();
+        summary.put("totalPackages", jdepsResult.totalPackages());
+        summary.put("totalDependencies", jdepsResult.totalDependencies());
+        summary.put("cycleCount", jdepsResult.cycleCount());
+        summary.put("jdkInternalCount", jdepsResult.jdkInternalCount());
+        summary.put("avgInstability", Math.round(jdepsResult.avgInstability() * 100.0) / 100.0);
+        analysis.put("summary", summary);
+
+        // Dépendances par package
+        List<Map<String, Object>> dependencies = new ArrayList<>();
+        for (var dep : jdepsResult.packageDependencies()) {
+            Map<String, Object> depData = new LinkedHashMap<>();
+            depData.put("sourcePackage", dep.sourcePackage());
+            depData.put("targetPackage", dep.targetPackage());
+            depData.put("targetModule", dep.targetModule());
+            dependencies.add(depData);
+        }
+        analysis.put("packageDependencies", dependencies);
+
+        // Cycles de dépendances
+        List<Map<String, Object>> cycles = new ArrayList<>();
+        for (var cycle : jdepsResult.cycles()) {
+            Map<String, Object> cycleData = new LinkedHashMap<>();
+            cycleData.put("packages", cycle.packages());
+            cycleData.put("length", cycle.length());
+            cycleData.put("cycleString", cycle.toCycleString());
+            cycles.add(cycleData);
+        }
+        analysis.put("cycles", cycles);
+
+        // Usages d'APIs internes JDK
+        List<Map<String, Object>> jdkInternals = new ArrayList<>();
+        for (var usage : jdepsResult.jdkInternalUsages()) {
+            Map<String, Object> usageData = new LinkedHashMap<>();
+            usageData.put("sourceClass", usage.sourceClass());
+            usageData.put("internalApi", usage.internalApi());
+            usageData.put("module", usage.targetModule());
+            usageData.put("suggestion", usage.suggestion());
+            jdkInternals.add(usageData);
+        }
+        analysis.put("jdkInternalUsages", jdkInternals);
+
+        // Métriques par package
+        List<Map<String, Object>> metrics = new ArrayList<>();
+        for (var entry : jdepsResult.packageMetrics().entrySet()) {
+            var pm = entry.getValue();
+            Map<String, Object> metricData = new LinkedHashMap<>();
+            metricData.put("packageName", pm.packageName());
+            metricData.put("afferentCoupling", pm.afferentCoupling());
+            metricData.put("efferentCoupling", pm.efferentCoupling());
+            metricData.put("instability", Math.round(pm.instability() * 100.0) / 100.0);
+            metricData.put("dependsOn", pm.dependsOn());
+            metricData.put("usedBy", pm.usedBy());
+            metrics.add(metricData);
+        }
+        // Trier par instabilité décroissante
+        metrics.sort((a, b) -> Double.compare(
+            (Double) b.get("instability"),
+            (Double) a.get("instability")
+        ));
+        analysis.put("packageMetrics", metrics);
+
+        return analysis;
     }
 
     /**

@@ -5,6 +5,8 @@ import fr.cnam.migration.autofix.AutoFixService;
 import fr.cnam.migration.autofix.model.AutoFixResult;
 import fr.cnam.migration.cadre.CadrePackageDownloader;
 import fr.cnam.migration.config.MigrationConfig;
+import fr.cnam.migration.jdeps.JdepsAnalyzer;
+import fr.cnam.migration.jdeps.JdepsResult;
 import fr.cnam.migration.config.MigrationConfig.DeploymentMode;
 import fr.cnam.migration.config.MigrationConfig.RemoteTarget;
 import fr.cnam.migration.cve.CveAnalyzer;
@@ -243,6 +245,14 @@ public class Ant2MavenApplication implements Callable<Integer> {
         description = "Telecharge les dependances cadre depuis [DEPENDANCES_FAB] avant le scan"
     )
     private boolean scanCadre;
+
+    // === Option Analyse jdeps ===
+
+    @Option(
+        names = {"--jdeps-analysis"},
+        description = "Execute l'analyse structurelle jdeps apres compilation (ou variable JDEPS_ANALYSIS)"
+    )
+    private boolean jdepsAnalysis;
 
     @Override
     public Integer call() {
@@ -522,7 +532,19 @@ public class Ant2MavenApplication implements Callable<Integer> {
                 }
             }
 
-            // Soumettre le rapport à ReportUI si configuré (après auto-fix et CVE pour tout inclure)
+            // Phase 6 : Analyse jdeps (si activée)
+            JdepsResult jdepsResult = JdepsResult.empty();
+            if (jdepsAnalysis || "true".equalsIgnoreCase(System.getenv("JDEPS_ANALYSIS"))) {
+                // L'analyse jdeps necessite une compilation reussie
+                if (fixResult == null || fixResult.isSuccess()) {
+                    JdepsAnalyzer jdepsAnalyzer = new JdepsAnalyzer(verbose);
+                    jdepsResult = jdepsAnalyzer.analyze(result.outputDir());
+                } else {
+                    log.warn("Analyse jdeps ignoree : la compilation a echoue");
+                }
+            }
+
+            // Soumettre le rapport à ReportUI si configuré (après auto-fix, CVE et jdeps pour tout inclure)
             if (reportUiUrl != null && !reportUiUrl.isBlank()) {
                 log.info("");
                 log.info("Submitting report to ReportUI at {}...", reportUiUrl);
@@ -533,7 +555,7 @@ public class Ant2MavenApplication implements Callable<Integer> {
                     if (config.isRemoteDeployment()) {
                         deployedLibraries = collectDeployedLibraries(analysis, fixResult, config);
                     }
-                    reportUiClient.submitReport(project, analysis, fixResult, cveResult, config, deployedLibraries);
+                    reportUiClient.submitReport(project, analysis, fixResult, cveResult, jdepsResult, config, deployedLibraries);
                 } catch (Exception e) {
                     log.warn("Failed to submit report to ReportUI: {}", e.getMessage());
                 }
