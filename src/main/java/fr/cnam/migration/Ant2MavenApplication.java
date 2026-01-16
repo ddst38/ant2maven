@@ -7,6 +7,8 @@ import fr.cnam.migration.cadre.CadrePackageDownloader;
 import fr.cnam.migration.config.MigrationConfig;
 import fr.cnam.migration.jdeps.JdepsAnalyzer;
 import fr.cnam.migration.jdeps.JdepsResult;
+import fr.cnam.migration.sonar.SonarAnalyzer;
+import fr.cnam.migration.sonar.SonarAnalysisResult;
 import fr.cnam.migration.config.MigrationConfig.DeploymentMode;
 import fr.cnam.migration.config.MigrationConfig.RemoteTarget;
 import fr.cnam.migration.cve.CveAnalyzer;
@@ -253,6 +255,33 @@ public class Ant2MavenApplication implements Callable<Integer> {
         description = "Execute l'analyse structurelle jdeps apres compilation (ou variable JDEPS_ANALYSIS)"
     )
     private boolean jdepsAnalysis;
+
+    // === Options Analyse SonarQube ===
+
+    @Option(
+        names = {"--sonar-analysis"},
+        description = "Execute l'analyse SonarQube apres compilation (ou variable SONAR_ANALYSIS)"
+    )
+    private boolean sonarAnalysis;
+
+    @Option(
+        names = {"--sonar-url"},
+        description = "URL du serveur SonarQube (defaut: http://localhost:9000, ou variable SONAR_URL)",
+        defaultValue = "http://localhost:9000"
+    )
+    private String sonarUrl;
+
+    @Option(
+        names = {"--sonar-token"},
+        description = "Token d'authentification SonarQube (ou variable SONAR_TOKEN)"
+    )
+    private String sonarToken;
+
+    @Option(
+        names = {"--sonar-project-key"},
+        description = "Cle du projet SonarQube (defaut: nom du projet)"
+    )
+    private String sonarProjectKey;
 
     @Override
     public Integer call() {
@@ -544,7 +573,33 @@ public class Ant2MavenApplication implements Callable<Integer> {
                 }
             }
 
-            // Soumettre le rapport à ReportUI si configuré (après auto-fix, CVE et jdeps pour tout inclure)
+            // Phase 7 : Analyse SonarQube (si activée)
+            SonarAnalysisResult sonarResult = SonarAnalysisResult.empty();
+            if (sonarAnalysis || "true".equalsIgnoreCase(System.getenv("SONAR_ANALYSIS"))) {
+                // Récupérer le token et l'URL depuis les variables d'environnement si non fournis
+                String effectiveSonarUrl = sonarUrl;
+                if (effectiveSonarUrl == null || effectiveSonarUrl.isBlank()) {
+                    effectiveSonarUrl = System.getenv("SONAR_URL");
+                    if (effectiveSonarUrl == null) effectiveSonarUrl = "http://localhost:9000";
+                }
+
+                String effectiveSonarToken = sonarToken;
+                if (effectiveSonarToken == null || effectiveSonarToken.isBlank()) {
+                    effectiveSonarToken = System.getenv("SONAR_TOKEN");
+                }
+
+                if (effectiveSonarToken == null || effectiveSonarToken.isBlank()) {
+                    log.warn("Analyse SonarQube ignoree : token non fourni (--sonar-token ou SONAR_TOKEN)");
+                } else if (fixResult == null || fixResult.isSuccess()) {
+                    SonarAnalyzer sonarAnalyzer = new SonarAnalyzer(
+                        effectiveSonarUrl, effectiveSonarToken, sonarProjectKey, verbose);
+                    sonarResult = sonarAnalyzer.analyze(result.outputDir());
+                } else {
+                    log.warn("Analyse SonarQube ignoree : la compilation a echoue");
+                }
+            }
+
+            // Soumettre le rapport à ReportUI si configuré (après auto-fix, CVE, jdeps et Sonar pour tout inclure)
             if (reportUiUrl != null && !reportUiUrl.isBlank()) {
                 log.info("");
                 log.info("Submitting report to ReportUI at {}...", reportUiUrl);
@@ -555,7 +610,7 @@ public class Ant2MavenApplication implements Callable<Integer> {
                     if (config.isRemoteDeployment()) {
                         deployedLibraries = collectDeployedLibraries(analysis, fixResult, config);
                     }
-                    reportUiClient.submitReport(project, analysis, fixResult, cveResult, jdepsResult, config, deployedLibraries);
+                    reportUiClient.submitReport(project, analysis, fixResult, cveResult, jdepsResult, sonarResult, config, deployedLibraries);
                 } catch (Exception e) {
                     log.warn("Failed to submit report to ReportUI: {}", e.getMessage());
                 }

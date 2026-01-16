@@ -111,22 +111,34 @@ public class ReportUiClient {
 
     /**
      * Soumet un rapport de migration complet avec analyse jdeps.
+     */
+    public void submitReport(ProjectStructure project, AnalysisResult analysis,
+                            AutoFixResult autoFixResult, CveAnalysisResult cveResult,
+                            fr.cnam.migration.jdeps.JdepsResult jdepsResult,
+                            MigrationConfig config, List<DeployedLibrary> deployedLibraries) {
+        submitReport(project, analysis, autoFixResult, cveResult, jdepsResult, null, config, deployedLibraries);
+    }
+
+    /**
+     * Soumet un rapport de migration complet avec analyse jdeps et Sonar.
      *
      * @param project Structure du projet
      * @param analysis Résultat de l'analyse des dépendances
      * @param autoFixResult Résultat de l'auto-fix (peut être null)
      * @param cveResult Résultat de l'analyse CVE (peut être null)
      * @param jdepsResult Résultat de l'analyse jdeps (peut être null)
+     * @param sonarResult Résultat de l'analyse SonarQube (peut être null)
      * @param config Configuration de migration (pour infos de déploiement)
      * @param deployedLibraries Liste des librairies déployées sur le repository distant
      */
     public void submitReport(ProjectStructure project, AnalysisResult analysis,
                             AutoFixResult autoFixResult, CveAnalysisResult cveResult,
                             fr.cnam.migration.jdeps.JdepsResult jdepsResult,
+                            fr.cnam.migration.sonar.SonarAnalysisResult sonarResult,
                             MigrationConfig config, List<DeployedLibrary> deployedLibraries) {
         try {
             Map<String, Object> request = buildRequest(project, analysis, autoFixResult, cveResult,
-                                                       jdepsResult, config, deployedLibraries);
+                                                       jdepsResult, sonarResult, config, deployedLibraries);
             String jsonBody = objectMapper.writeValueAsString(request);
 
             HttpRequest httpRequest = HttpRequest.newBuilder()
@@ -160,6 +172,7 @@ public class ReportUiClient {
     private Map<String, Object> buildRequest(ProjectStructure project, AnalysisResult analysis,
                                              AutoFixResult autoFixResult, CveAnalysisResult cveResult,
                                              fr.cnam.migration.jdeps.JdepsResult jdepsResult,
+                                             fr.cnam.migration.sonar.SonarAnalysisResult sonarResult,
                                              MigrationConfig config, List<DeployedLibrary> deployedLibraries) {
         Map<String, Object> request = new LinkedHashMap<>();
         request.put("projectName", project.name());
@@ -179,6 +192,11 @@ public class ReportUiClient {
         // Données jdeps
         if (jdepsResult != null && jdepsResult.analysisPerformed()) {
             request.put("jdepsAnalysis", buildJdepsAnalysis(jdepsResult));
+        }
+
+        // Données SonarQube
+        if (sonarResult != null && sonarResult.analysisPerformed()) {
+            request.put("sonarAnalysis", buildSonarAnalysis(sonarResult));
         }
 
         // Informations de déploiement (mode REMOTE uniquement)
@@ -257,6 +275,70 @@ public class ReportUiClient {
             (Double) a.get("instability")
         ));
         analysis.put("packageMetrics", metrics);
+
+        return analysis;
+    }
+
+    /**
+     * Construit les données d'analyse SonarQube pour le rapport.
+     */
+    private Map<String, Object> buildSonarAnalysis(fr.cnam.migration.sonar.SonarAnalysisResult sonarResult) {
+        Map<String, Object> analysis = new LinkedHashMap<>();
+
+        // Informations générales
+        analysis.put("projectKey", sonarResult.projectKey());
+        analysis.put("analysisDate", sonarResult.analysisDate());
+        analysis.put("qualityGateStatus", sonarResult.qualityGateStatus());
+
+        // Métriques
+        var metrics = sonarResult.metrics();
+        Map<String, Object> metricsData = new LinkedHashMap<>();
+        metricsData.put("technicalDebt", metrics.technicalDebt());
+        metricsData.put("technicalDebtFormatted", metrics.formattedDebt());
+        metricsData.put("debtRatio", Math.round(metrics.debtRatio() * 10.0) / 10.0);
+        metricsData.put("maintainabilityRating", metrics.maintainabilityRating());
+        metricsData.put("reliabilityRating", metrics.reliabilityRating());
+        metricsData.put("securityRating", metrics.securityRating());
+        metricsData.put("newTechnicalDebt", metrics.newTechnicalDebt());
+        metricsData.put("codeSmells", metrics.codeSmells());
+        metricsData.put("bugs", metrics.bugs());
+        metricsData.put("vulnerabilities", metrics.vulnerabilities());
+        metricsData.put("securityHotspots", metrics.securityHotspots());
+        metricsData.put("securityHotspotsReviewed", metrics.securityHotspotsReviewed());
+        metricsData.put("coverage", Math.round(metrics.coverage() * 10.0) / 10.0);
+        metricsData.put("duplications", Math.round(metrics.duplications() * 10.0) / 10.0);
+        metricsData.put("linesOfCode", metrics.linesOfCode());
+        analysis.put("metrics", metricsData);
+
+        // Résumé des issues par sévérité
+        analysis.put("issuesBySeverity", sonarResult.issuesBySeverity());
+
+        // Résumé des issues par type
+        Map<String, Integer> issuesByType = new LinkedHashMap<>();
+        for (var entry : sonarResult.issuesByType().entrySet()) {
+            issuesByType.put(entry.getKey(), entry.getValue().size());
+        }
+        analysis.put("issuesByType", issuesByType);
+
+        // Top issues (limité à 50)
+        List<Map<String, Object>> topIssues = new ArrayList<>();
+        for (var issue : sonarResult.topIssues(50)) {
+            Map<String, Object> issueData = new LinkedHashMap<>();
+            issueData.put("key", issue.key());
+            issueData.put("rule", issue.rule());
+            issueData.put("severity", issue.severity());
+            issueData.put("type", issue.type());
+            issueData.put("message", issue.message());
+            issueData.put("component", issue.relativePath());
+            issueData.put("line", issue.line());
+            issueData.put("effort", issue.effort());
+            topIssues.add(issueData);
+        }
+        analysis.put("issues", topIssues);
+
+        // Totaux
+        analysis.put("totalIssues", sonarResult.totalIssues());
+        analysis.put("criticalIssuesCount", sonarResult.criticalIssuesCount());
 
         return analysis;
     }
