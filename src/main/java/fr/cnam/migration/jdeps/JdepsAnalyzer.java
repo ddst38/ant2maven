@@ -217,6 +217,8 @@ public class JdepsAnalyzer {
             command.add("jdeps");
             command.add("-verbose:package");
             command.add("-R");
+            command.add("--multi-release");
+            command.add("base");
             if (!classpath.isBlank()) {
                 command.add("-classpath");
                 command.add(classpath);
@@ -281,6 +283,8 @@ public class JdepsAnalyzer {
             List<String> command = new ArrayList<>();
             command.add("jdeps");
             command.add("--jdk-internals");
+            command.add("--multi-release");
+            command.add("base");
             if (!classpath.isBlank()) {
                 command.add("-classpath");
                 command.add(classpath);
