@@ -52,15 +52,11 @@ public class JdepsAnalyzer {
         log.info("Phase 6: Analyse structurelle (jdeps)");
         log.info("=".repeat(60));
 
-        // Verifier que target/classes existe
-        Path targetClasses = projectDir.resolve("target/classes");
-        if (!Files.isDirectory(targetClasses)) {
-            // Chercher dans les sous-modules
-            targetClasses = findTargetClasses(projectDir);
-            if (targetClasses == null) {
-                log.warn("Repertoire target/classes non trouve. Compilation necessaire.");
-                return JdepsResult.failed();
-            }
+        // Trouver tous les repertoires target/classes (racine + sous-modules)
+        List<Path> allTargetClasses = findAllTargetClasses(projectDir);
+        if (allTargetClasses.isEmpty()) {
+            log.warn("Aucun repertoire target/classes trouve. Compilation necessaire.");
+            return JdepsResult.failed();
         }
 
         try {
@@ -71,14 +67,25 @@ public class JdepsAnalyzer {
                 classpath = "";
             }
 
-            // Executer jdeps pour les dependances par package
+            // Executer jdeps sur TOUS les modules
             log.info("Analyse des dependances par package...");
-            List<PackageDependency> dependencies = analyzePackageDependencies(targetClasses, classpath);
-            log.info("  {} dependances trouvees", dependencies.size());
+            log.info("  {} module(s) a analyser", allTargetClasses.size());
 
-            // Executer jdeps pour les APIs internes JDK
-            log.info("Recherche des APIs internes JDK...");
-            List<JdkInternalUsage> jdkInternals = analyzeJdkInternals(targetClasses, classpath);
+            List<PackageDependency> dependencies = new ArrayList<>();
+            List<JdkInternalUsage> jdkInternals = new ArrayList<>();
+
+            for (Path targetClasses : allTargetClasses) {
+                String moduleName = targetClasses.getParent().getParent().getFileName().toString();
+                log.info("  Module: {}", moduleName);
+
+                List<PackageDependency> moduleDeps = analyzePackageDependencies(targetClasses, classpath);
+                dependencies.addAll(moduleDeps);
+
+                List<JdkInternalUsage> moduleInternals = analyzeJdkInternals(targetClasses, classpath);
+                jdkInternals.addAll(moduleInternals);
+            }
+
+            log.info("  {} dependances trouvees au total", dependencies.size());
             log.info("  {} usages d'APIs internes detectes", jdkInternals.size());
 
             // Calculer les metriques par package
@@ -123,18 +130,28 @@ public class JdepsAnalyzer {
     }
 
     /**
-     * Cherche le repertoire target/classes dans les sous-modules.
+     * Cherche TOUS les repertoires target/classes dans le projet (racine + sous-modules).
      */
-    private Path findTargetClasses(Path projectDir) {
-        try (var walk = Files.walk(projectDir, 3)) {
-            return walk
-                .filter(p -> p.endsWith("target/classes"))
-                .filter(Files::isDirectory)
-                .findFirst()
-                .orElse(null);
-        } catch (IOException e) {
-            return null;
+    private List<Path> findAllTargetClasses(Path projectDir) {
+        List<Path> result = new ArrayList<>();
+
+        // Verifier la racine
+        Path rootClasses = projectDir.resolve("target/classes");
+        if (Files.isDirectory(rootClasses)) {
+            result.add(rootClasses);
         }
+
+        // Chercher dans les sous-modules
+        try (var walk = Files.walk(projectDir, 3)) {
+            walk.filter(p -> p.endsWith("target/classes"))
+                .filter(Files::isDirectory)
+                .filter(p -> !p.equals(rootClasses)) // Eviter doublon avec racine
+                .forEach(result::add);
+        } catch (IOException e) {
+            // Ignorer
+        }
+
+        return result;
     }
 
     /**
@@ -206,15 +223,27 @@ public class JdepsAnalyzer {
             }
             command.add(targetClasses.toString());
 
+            if (verbose) {
+                log.debug("Commande jdeps: {}", String.join(" ", command));
+                log.debug("Target classes: {} (exists: {})", targetClasses, Files.isDirectory(targetClasses));
+            }
+
             ProcessBuilder pb = new ProcessBuilder(command);
             pb.redirectErrorStream(true);
 
             Process process = pb.start();
+            int lineCount = 0;
+            int matchCount = 0;
             try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
                 String line;
                 while ((line = reader.readLine()) != null) {
+                    lineCount++;
+                    if (verbose && lineCount <= 3) {
+                        log.debug("jdeps output [{}]: {}", lineCount, line);
+                    }
                     Matcher matcher = DEPENDENCY_PATTERN.matcher(line);
                     if (matcher.matches()) {
+                        matchCount++;
                         String source = matcher.group(1);
                         String target = matcher.group(2);
                         String module = matcher.group(3);
@@ -227,10 +256,16 @@ public class JdepsAnalyzer {
                 }
             }
 
-            process.waitFor();
+            int exitCode = process.waitFor();
+            if (verbose) {
+                log.debug("jdeps exit code: {}, lines: {}, matches: {}", exitCode, lineCount, matchCount);
+            }
 
         } catch (Exception e) {
             log.warn("Erreur analyse dependances: {}", e.getMessage());
+            if (verbose) {
+                log.warn("Stack trace:", e);
+            }
         }
 
         return dependencies;
