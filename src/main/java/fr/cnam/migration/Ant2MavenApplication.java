@@ -2,6 +2,7 @@ package fr.cnam.migration;
 
 import fr.cnam.migration.analyzer.DependencyAnalyzer;
 import fr.cnam.migration.autofix.AutoFixService;
+import fr.cnam.migration.autofix.CompilationRunner;
 import fr.cnam.migration.autofix.model.AutoFixResult;
 import fr.cnam.migration.cadre.CadrePackageDownloader;
 import fr.cnam.migration.config.MigrationConfig;
@@ -285,13 +286,25 @@ public class Ant2MavenApplication implements Callable<Integer> {
     )
     private String sonarProjectKey;
 
-    // === Option Analyse OSS Index ===
+    // === Options Analyse OSS Index ===
 
     @Option(
         names = {"--oss-analysis"},
         description = "Execute l'analyse OSS Index (viabilite dependances) apres Sonar (ou variable OSS_ANALYSIS)"
     )
     private boolean ossAnalysis;
+
+    @Option(
+        names = {"--ossindex-user"},
+        description = "Email du compte OSS Index (ou variable OSSINDEX_USER)"
+    )
+    private String ossindexUser;
+
+    @Option(
+        names = {"--ossindex-token"},
+        description = "Token API OSS Index (ou variable OSSINDEX_TOKEN)"
+    )
+    private String ossindexToken;
 
     @Override
     public Integer call() {
@@ -575,11 +588,34 @@ public class Ant2MavenApplication implements Callable<Integer> {
             JdepsResult jdepsResult = JdepsResult.empty();
             if (jdepsAnalysis || "true".equalsIgnoreCase(System.getenv("JDEPS_ANALYSIS"))) {
                 // L'analyse jdeps necessite une compilation reussie
-                if (fixResult == null || fixResult.isSuccess()) {
-                    JdepsAnalyzer jdepsAnalyzer = new JdepsAnalyzer(verbose);
-                    jdepsResult = jdepsAnalyzer.analyze(result.outputDir());
-                } else {
+                if (fixResult != null && !fixResult.isSuccess()) {
                     log.warn("Analyse jdeps ignoree : la compilation a echoue");
+                } else {
+                    // Verifier si le projet est compile (target/classes existe)
+                    boolean needsCompilation = !hasCompiledClasses(result.outputDir());
+
+                    if (needsCompilation && fixResult == null) {
+                        // Compiler automatiquement si --auto-fix n'a pas ete utilise
+                        log.info("");
+                        log.info("=".repeat(60));
+                        log.info("Compilation automatique pour analyse jdeps");
+                        log.info("=".repeat(60));
+
+                        CompilationRunner compilationRunner = new CompilationRunner();
+                        var compilationResult = compilationRunner.compile(result.outputDir());
+
+                        if (!compilationResult.success()) {
+                            log.warn("Compilation echouee, analyse jdeps ignoree");
+                            log.warn("Erreurs: {}", compilationResult.stderr());
+                        } else {
+                            needsCompilation = false;
+                        }
+                    }
+
+                    if (!needsCompilation || (fixResult != null && fixResult.isSuccess())) {
+                        JdepsAnalyzer jdepsAnalyzer = new JdepsAnalyzer(verbose);
+                        jdepsResult = jdepsAnalyzer.analyze(result.outputDir());
+                    }
                 }
             }
 
@@ -613,7 +649,17 @@ public class Ant2MavenApplication implements Callable<Integer> {
             OssAnalysisResult ossResult = OssAnalysisResult.empty();
             if (ossAnalysis || "true".equalsIgnoreCase(System.getenv("OSS_ANALYSIS"))) {
                 if (fixResult == null || fixResult.isSuccess()) {
-                    OssIndexAnalyzer ossAnalyzer = new OssIndexAnalyzer(verbose);
+                    // Récupérer les credentials depuis les variables d'environnement si non fournis
+                    String effectiveOssUser = ossindexUser;
+                    if (effectiveOssUser == null || effectiveOssUser.isBlank()) {
+                        effectiveOssUser = System.getenv("OSSINDEX_USER");
+                    }
+                    String effectiveOssToken = ossindexToken;
+                    if (effectiveOssToken == null || effectiveOssToken.isBlank()) {
+                        effectiveOssToken = System.getenv("OSSINDEX_TOKEN");
+                    }
+
+                    OssIndexAnalyzer ossAnalyzer = new OssIndexAnalyzer(verbose, effectiveOssUser, effectiveOssToken);
                     ossResult = ossAnalyzer.analyze(result.outputDir());
                 } else {
                     log.warn("Analyse OSS Index ignoree : la compilation a echoue");
@@ -834,6 +880,40 @@ public class Ant2MavenApplication implements Callable<Integer> {
         }
 
         return null;
+    }
+
+    /**
+     * Verifie si le projet contient des classes compilees (target/classes).
+     * Cherche dans le repertoire racine et dans les sous-modules.
+     */
+    private boolean hasCompiledClasses(Path projectDir) {
+        // Verifier target/classes a la racine
+        Path rootClasses = projectDir.resolve("target/classes");
+        if (java.nio.file.Files.isDirectory(rootClasses)) {
+            try (var stream = java.nio.file.Files.list(rootClasses)) {
+                if (stream.findAny().isPresent()) {
+                    return true;
+                }
+            } catch (Exception e) {
+                // Ignorer
+            }
+        }
+
+        // Chercher dans les sous-modules (profondeur max 3)
+        try (var walk = java.nio.file.Files.walk(projectDir, 3)) {
+            return walk
+                .filter(p -> p.endsWith("target/classes"))
+                .filter(java.nio.file.Files::isDirectory)
+                .anyMatch(p -> {
+                    try (var stream = java.nio.file.Files.list(p)) {
+                        return stream.findAny().isPresent();
+                    } catch (Exception e) {
+                        return false;
+                    }
+                });
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     public static void main(String[] args) {

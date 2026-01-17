@@ -19,8 +19,9 @@ public class JdepsAnalyzer {
 
     // Pattern pour parser la sortie jdeps verbose:package
     // Format: "   fr.cnam.app.service -> java.util    java.base"
+    // ou:     "   fr.cnam.app.service -> org.external    not found"
     private static final Pattern DEPENDENCY_PATTERN = Pattern.compile(
-        "^\\s+([\\w.]+)\\s+->\\s+([\\w.]+)(?:\\s+([\\w.]+))?\\s*$"
+        "^\\s+([\\w.]+)\\s+->\\s+([\\w.]+)(?:\\s+([\\w.]+|not found))?\\s*$"
     );
 
     // Pattern pour parser la sortie jdeps --jdk-internals

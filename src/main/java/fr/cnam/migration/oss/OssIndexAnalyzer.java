@@ -43,9 +43,17 @@ public class OssIndexAnalyzer {
     );
 
     private final boolean verbose;
+    private final String ossindexUser;
+    private final String ossindexToken;
 
     public OssIndexAnalyzer(boolean verbose) {
+        this(verbose, null, null);
+    }
+
+    public OssIndexAnalyzer(boolean verbose, String ossindexUser, String ossindexToken) {
         this.verbose = verbose;
+        this.ossindexUser = ossindexUser;
+        this.ossindexToken = ossindexToken;
     }
 
     /**
@@ -200,11 +208,46 @@ public class OssIndexAnalyzer {
             args.add("-pl");
             args.add("!" + String.join(",!", excludedModules));
         }
-        args.addAll(List.of("org.sonatype.ossindex.maven:ossindex-maven-plugin:audit", "-Dossindex.fail=false"));
+
+        // Creer un settings.xml temporaire si credentials disponibles
+        Path tempSettings = null;
+        if (ossindexUser != null && !ossindexUser.isBlank() &&
+            ossindexToken != null && !ossindexToken.isBlank()) {
+            try {
+                tempSettings = createOssIndexSettings(projectDir, ossindexUser, ossindexToken);
+                args.add("-s");
+                args.add(tempSettings.toAbsolutePath().toString());
+            } catch (Exception e) {
+                log.warn("Impossible de creer le settings.xml temporaire: {}", e.getMessage());
+            }
+        }
+
+        args.add("org.sonatype.ossindex.maven:ossindex-maven-plugin:audit");
+        args.add("-Dossindex.fail=false");
+
+        // Authentification OSS Index via authId (reference au server dans settings.xml)
+        if (ossindexUser != null && !ossindexUser.isBlank() &&
+            ossindexToken != null && !ossindexToken.isBlank()) {
+            args.add("-DossIndex.authId=ossindex");
+        }
 
         String output = runMavenCommand(projectDir, args.toArray(new String[0]));
 
+        // Supprimer le fichier temporaire
+        if (tempSettings != null) {
+            try {
+                Files.deleteIfExists(tempSettings);
+            } catch (Exception ignored) {}
+        }
+
         if (output == null) {
+            return vulnerabilities;
+        }
+
+        // Verifier si l'execution a echoue (dependances non resolvables)
+        if (output.contains("Could not resolve dependencies") ||
+            output.contains("BUILD FAILURE")) {
+            log.warn("Analyse vulnerabilites OSS ignoree: dependances non resolvables");
             return vulnerabilities;
         }
 
@@ -354,6 +397,13 @@ public class OssIndexAnalyzer {
      * Execute une commande Maven et retourne la sortie.
      */
     private String runMavenCommand(Path projectDir, String... goals) {
+        return runMavenCommand(projectDir, null, goals);
+    }
+
+    /**
+     * Execute une commande Maven avec des variables d'environnement supplementaires.
+     */
+    private String runMavenCommand(Path projectDir, Map<String, String> extraEnv, String... goals) {
         try {
             List<String> command = new ArrayList<>();
             command.add(getMvnCommand(projectDir));
@@ -368,6 +418,11 @@ public class OssIndexAnalyzer {
             ProcessBuilder pb = new ProcessBuilder(command);
             pb.directory(projectDir.toFile());
             pb.redirectErrorStream(true);
+
+            // Ajouter les variables d'environnement supplementaires
+            if (extraEnv != null && !extraEnv.isEmpty()) {
+                pb.environment().putAll(extraEnv);
+            }
 
             Process process = pb.start();
             StringBuilder output = new StringBuilder();
@@ -396,6 +451,69 @@ public class OssIndexAnalyzer {
             log.warn("Erreur commande Maven: {}", e.getMessage());
             return null;
         }
+    }
+
+    /**
+     * Cree un fichier settings.xml temporaire avec les credentials OSS Index,
+     * en fusionnant avec le settings.xml existant du projet ou de l'utilisateur.
+     */
+    private Path createOssIndexSettings(Path projectDir, String username, String token) throws Exception {
+        // Chercher le settings.xml existant (priorite au .mvn/wrapper du projet migre)
+        Path mvnWrapperSettings = projectDir.resolve(".mvn/wrapper/settings.xml");
+        Path projectSettings = projectDir.resolve("settings.xml");
+        Path userSettings = Path.of(System.getProperty("user.home"), ".m2", "settings.xml");
+
+        String baseContent = null;
+        if (Files.exists(mvnWrapperSettings)) {
+            baseContent = Files.readString(mvnWrapperSettings);
+            log.debug("Utilisation du settings.xml de .mvn/wrapper/");
+        } else if (Files.exists(projectSettings)) {
+            baseContent = Files.readString(projectSettings);
+        } else if (Files.exists(userSettings)) {
+            baseContent = Files.readString(userSettings);
+        }
+
+        String ossIndexServer = """
+                <server>
+                  <id>ossindex</id>
+                  <username>%s</username>
+                  <password>%s</password>
+                </server>""".formatted(username, token);
+
+        String settingsContent;
+        if (baseContent != null && baseContent.contains("<servers>")) {
+            // Ajouter le serveur ossindex dans la section servers existante
+            settingsContent = baseContent.replace("</servers>", ossIndexServer + "\n    </servers>");
+        } else if (baseContent != null && baseContent.contains("</settings>")) {
+            // Creer la section servers
+            String serversSection = """
+              <servers>
+            %s
+              </servers>
+            </settings>""".formatted(ossIndexServer);
+            settingsContent = baseContent.replace("</settings>", serversSection);
+        } else {
+            // Creer un settings.xml complet
+            settingsContent = """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
+                          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                          xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0
+                                              http://maven.apache.org/xsd/settings-1.0.0.xsd">
+                  <servers>
+                %s
+                  </servers>
+                </settings>
+                """.formatted(ossIndexServer);
+        }
+
+        Path tempFile = Files.createTempFile("ossindex-settings", ".xml");
+        Files.writeString(tempFile, settingsContent);
+        log.debug("Settings OSS Index temporaire: {}", tempFile);
+        if (verbose) {
+            log.debug("Contenu settings:\n{}", settingsContent);
+        }
+        return tempFile;
     }
 
     /**
