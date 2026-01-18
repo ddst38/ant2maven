@@ -190,6 +190,7 @@ public class ReportUiClient {
                                              MigrationConfig config, List<DeployedLibrary> deployedLibraries) {
         Map<String, Object> request = new LinkedHashMap<>();
         request.put("projectName", project.name());
+        request.put("migrationType", "ant2maven");
         request.put("migrationDate", LocalDateTime.now().toString());
         request.put("statistics", buildStatistics(project, analysis, autoFixResult));
         request.put("libraries", buildLibraries(analysis, autoFixResult));

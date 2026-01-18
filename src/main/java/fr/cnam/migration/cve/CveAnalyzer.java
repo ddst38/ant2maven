@@ -24,10 +24,12 @@ public class CveAnalyzer {
     private static final int TIMEOUT_MINUTES = 30;
 
     private final String nvdApiKey;
+    private final String dataDir;
     private final boolean verbose;
 
-    public CveAnalyzer(String nvdApiKey, boolean verbose) {
+    public CveAnalyzer(String nvdApiKey, String dataDir, boolean verbose) {
         this.nvdApiKey = nvdApiKey;
+        this.dataDir = dataDir;
         this.verbose = verbose;
     }
 
@@ -147,6 +149,12 @@ public class CveAnalyzer {
         cmd.append(" -DprettyPrint=true");
         // Désactiver OSS Index (nécessite authentification Sonatype)
         cmd.append(" -DossindexAnalyzerEnabled=false");
+
+        // Répertoire de stockage de la base NVD (évite re-téléchargement)
+        if (dataDir != null && !dataDir.isBlank()) {
+            cmd.append(" -DdataDirectory=").append(dataDir);
+            log.info("Base NVD : {}", dataDir);
+        }
 
         // Exclure les modules de distribution (dépendent du JAR compilé)
         if (excludeModules != null && !excludeModules.isEmpty()) {

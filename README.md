@@ -28,18 +28,36 @@ Outil de migration automatique pour transformer des projets Java Ant/CVS en proj
 
 ## Fonctionnalités
 
+### Migration de base
 - **Analyse automatique** des projets Ant/CVS
-- **Détection des dépendances** via lookup SHA1 sur Maven Central et/ou Artifactory
+- **Détection des dépendances** via lookup SHA1 sur Maven Central, Artifactory et/ou Nexus
 - **Cache automatique** : les résolutions sont sauvegardées pour accélérer les exécutions suivantes
 - **Support multi-modules** : génération de projets WAR/EAR
+- **Scan cadre** : Support des projets "cadre" multi-modules (`--scan-cadre`)
 - **Gestion des JARs internes** avec versionnement SHA pour éviter les collisions
-- **Intégration Artifactory** avec support SSL personnalisé
-- **Modes de déploiement** : LOCAL (repository .m2) ou REMOTE (upload Artifactory)
-- **Mode Auto-Fix** : correction automatique des erreurs de compilation via `--auto-fix`
 - **Inference groupId** : analyse du contenu des JARs pour inférer le groupId depuis les packages Java
-- **Rapports HTML** détaillés sur la migration
 - **Scripts d'installation** pour les JARs internes
 - **Configuration flexible** via fichier YAML ou ligne de commande
+
+### Intégration gestionnaires d'artefacts
+- **Intégration Artifactory** avec support SSL personnalisé
+- **Intégration Nexus** avec support SSL personnalisé
+- **Modes de déploiement** : LOCAL (repository .m2) ou REMOTE (upload Artifactory/Nexus)
+- **Repository de déploiement** configurable via `--deploy-repo`
+
+### Correction automatique
+- **Mode Auto-Fix** : correction automatique des erreurs de compilation via `--auto-fix`
+
+### Analyses complémentaires
+- **Analyse CVE** : Détection des vulnérabilités connues via NVD (`--cve-check`)
+- **Analyse jdeps** : Analyse structurelle des dépendances Java (`--jdeps-analysis`)
+- **Analyse SonarQube** : Qualité du code source (`--sonar-analysis`)
+- **Analyse OSS Index** : Viabilité des dépendances open-source (`--oss-analysis`)
+
+### Rapports et intégration
+- **Rapports HTML** détaillés sur la migration
+- **Intégration Report-UI** : Envoi des rapports vers interface web centralisée (`--report-ui-url`)
+- **Type de migration** : Support de différents types (ant2maven, toplink-to-jpa...)
 
 ---
 
@@ -101,11 +119,17 @@ java -jar ant2maven-1.0.0-SNAPSHOT.jar -p ./MonProjet \
 | `-p` | `--project` | **Requis.** Chemin du projet Ant source |
 | `-o` | `--output` | Répertoire de sortie (défaut: `<projet>-maven`) |
 | `-v` | `--verbose` | Mode verbeux |
+| `-k` | `--known-artifacts` | Fichier YAML de cache des artefacts |
 | | `--auto-fix` | Corrige automatiquement les erreurs de compilation |
 | | `--lib-provided` | Répertoire des JARs serveur (défaut: `lib-provided`) |
 | | `--dry-run` | Analyse sans générer de fichiers |
-| `-k` | `--known-artifacts` | Fichier YAML de cache des artefacts |
 | | `--base-package` | Package de base (défaut: `fr.cnamts`) |
+| | `--scan-cadre` | Active le scan des projets "cadre" multi-modules |
+| | `--report-ui-url` | URL de l'interface Report-UI pour envoi des rapports |
+| | `--cve-check` | Active l'analyse CVE des dépendances |
+| | `--jdeps-analysis` | Active l'analyse structurelle jdeps |
+| | `--sonar-analysis` | Active l'analyse SonarQube |
+| | `--oss-analysis` | Active l'analyse OSS Index |
 
 ---
 
@@ -158,7 +182,80 @@ java -jar ant2maven-1.0.0-SNAPSHOT.jar \
 | `--artifactory-snapshot-repo` | Nom du repository snapshots | `libs-snapshot-local` |
 | `--artifactory-user` | Nom d'utilisateur Artifactory | - |
 | `--artifactory-password` | Mot de passe Artifactory | - |
+
+#### Options Nexus
+
+| Option | Description | Valeur par défaut |
+|--------|-------------|-------------------|
+| `--nexus-url` | URL de base Nexus | - |
+| `--nexus-cert` | Chemin vers le certificat SSL (.crt) | - |
+| `--nexus-repo` | Nom du repository Nexus | `maven-releases` |
+| `--nexus-user` | Nom d'utilisateur Nexus | - |
+| `--nexus-password` | Mot de passe Nexus | - |
+
+#### Options de déploiement
+
+| Option | Description | Valeur par défaut |
+|--------|-------------|-------------------|
 | `--deploy-mode` | Mode de déploiement : LOCAL ou REMOTE | `LOCAL` |
+| `--remote-target` | Cible REMOTE : ARTIFACTORY ou NEXUS | `ARTIFACTORY` |
+| `--deploy-repo` | Nom du repository de déploiement | - |
+
+#### Options d'analyse CVE
+
+| Option | Description | Valeur par défaut |
+|--------|-------------|-------------------|
+| `--cve-check` | Active l'analyse des vulnérabilités CVE | `false` |
+| `--nvd-api-key` | Clé API NVD (National Vulnerability Database) | - |
+| `--cve-data-dir` | Répertoire de stockage de la base NVD | `~/.ant2maven/cve-data` |
+
+L'analyse CVE vérifie chaque dépendance résolue contre la base NVD pour identifier les vulnérabilités connues. Les résultats sont classés par sévérité (CRITICAL, HIGH, MEDIUM, LOW).
+
+Le paramètre `--cve-data-dir` permet de spécifier un répertoire persistant pour la base NVD. Par défaut, la base est stockée dans `~/.ant2maven/cve-data`, ce qui évite de re-télécharger les données à chaque analyse. Ce répertoire peut être partagé entre plusieurs projets.
+
+#### Options d'analyse jdeps
+
+| Option | Description | Valeur par défaut |
+|--------|-------------|-------------------|
+| `--jdeps-analysis` | Active l'analyse structurelle des dépendances | `false` |
+
+L'analyse jdeps utilise l'outil Java `jdeps` pour analyser les dépendances au niveau des packages. Elle identifie les modules JDK requis et les dépendances entre packages. Supporte les projets multi-modules et les JARs multi-release.
+
+#### Options d'analyse SonarQube
+
+| Option | Description | Valeur par défaut |
+|--------|-------------|-------------------|
+| `--sonar-analysis` | Active l'analyse qualité SonarQube | `false` |
+| `--sonar-url` | URL du serveur SonarQube | - |
+| `--sonar-token` | Token d'authentification SonarQube | - |
+
+L'analyse SonarQube évalue la qualité du code source : bugs, vulnérabilités, code smells, dette technique. Les résultats sont intégrés au rapport de migration.
+
+#### Options d'analyse OSS Index
+
+| Option | Description | Valeur par défaut |
+|--------|-------------|-------------------|
+| `--oss-analysis` | Active l'analyse de viabilité OSS | `false` |
+| `--ossindex-user` | Email utilisateur Sonatype OSS Index | - |
+| `--ossindex-token` | Token d'authentification OSS Index | - |
+
+L'analyse OSS Index vérifie la viabilité des dépendances open-source : vulnérabilités connues, maintenance active, popularité. Utilise l'API Sonatype OSS Index.
+
+#### Options Report-UI
+
+| Option | Description | Valeur par défaut |
+|--------|-------------|-------------------|
+| `--report-ui-url` | URL de l'interface Report-UI | - |
+
+Envoie automatiquement le rapport de migration vers l'interface web centralisée Report-UI pour visualisation et suivi.
+
+#### Options scan cadre
+
+| Option | Description | Valeur par défaut |
+|--------|-------------|-------------------|
+| `--scan-cadre` | Active le scan des projets "cadre" | `false` |
+
+Le mode scan-cadre permet de migrer des projets multi-modules de type "cadre" où plusieurs sous-projets partagent des dépendances communes.
 
 ### Exemples
 
@@ -232,6 +329,98 @@ java -jar ant2maven-1.0.0-SNAPSHOT.jar \
   --lib-provided /chemin/vers/weblogic-libs \
   -v
 ```
+
+#### Exemple 8 : Migration avec Nexus et déploiement REMOTE
+
+```bash
+java -jar ant2maven-1.0.0-SNAPSHOT.jar \
+  -p /projects/PRF2_A \
+  -o /projects/PRF2_A-maven \
+  --nexus-url http://localhost:8084 \
+  --nexus-user jenkins \
+  --nexus-password jenkins \
+  --deploy-mode REMOTE \
+  --remote-target NEXUS \
+  --deploy-repo migration-java-dette \
+  --auto-fix \
+  -v
+```
+
+#### Exemple 9 : Migration avec analyse CVE
+
+```bash
+java -jar ant2maven-1.0.0-SNAPSHOT.jar \
+  -p /projects/GMIC_J \
+  --auto-fix \
+  --cve-check \
+  --nvd-api-key votre-cle-api-nvd \
+  -v
+```
+
+#### Exemple 10 : Migration avec analyse SonarQube
+
+```bash
+java -jar ant2maven-1.0.0-SNAPSHOT.jar \
+  -p /projects/GMIC_J \
+  --auto-fix \
+  --sonar-analysis \
+  --sonar-url http://localhost:9000 \
+  --sonar-token squ_xxxxxxxxxxxx \
+  -v
+```
+
+#### Exemple 11 : Migration avec analyse OSS Index
+
+```bash
+java -jar ant2maven-1.0.0-SNAPSHOT.jar \
+  -p /projects/GMIC_J \
+  --auto-fix \
+  --oss-analysis \
+  --ossindex-user user@example.com \
+  --ossindex-token votre-token-oss \
+  -v
+```
+
+#### Exemple 12 : Migration complète avec toutes les options
+
+Cet exemple active toutes les fonctionnalités disponibles :
+
+```bash
+java -jar ant2maven-1.0.0-SNAPSHOT.jar \
+  -p ./PRF2_A \
+  -o ./PRF2_A-maven \
+  --nexus-url http://localhost:8084 \
+  --nexus-user jenkins \
+  --nexus-password jenkins \
+  --deploy-mode REMOTE \
+  --remote-target NEXUS \
+  --deploy-repo migration-java-dette \
+  --auto-fix \
+  --known-artifacts ./conf-Ant2maven/known-artifacts.yaml \
+  --report-ui-url http://localhost:8090 \
+  --cve-check \
+  --nvd-api-key votre-cle-api-nvd \
+  --scan-cadre \
+  --jdeps-analysis \
+  --sonar-analysis \
+  --sonar-url http://localhost:9000 \
+  --sonar-token squ_xxxxxxxxxxxx \
+  --oss-analysis \
+  --ossindex-user user@example.com \
+  --ossindex-token votre-token-oss \
+  -v
+```
+
+Cette commande :
+- Migre le projet `PRF2_A` vers Maven
+- Utilise Nexus pour la résolution et le déploiement des JARs
+- Active le mode auto-fix pour résoudre les dépendances manquantes
+- Envoie le rapport vers Report-UI
+- Effectue une analyse CVE des vulnérabilités
+- Active le scan cadre pour les projets multi-modules
+- Analyse les dépendances avec jdeps
+- Évalue la qualité du code avec SonarQube
+- Vérifie la viabilité des dépendances avec OSS Index
 
 ---
 

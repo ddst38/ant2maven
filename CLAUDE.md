@@ -68,26 +68,96 @@ java -jar target/ant2maven-1.0-SNAPSHOT.jar \
 
 ## Options CLI
 
+### Options de base
 | Option | Description |
 |--------|-------------|
 | `-p, --project` | Chemin projet ANT source |
 | `-o, --output` | Répertoire sortie Maven |
-| `--profile` | Profil (default/pic) |
+| `-k, --known-artifacts` | Fichier YAML de cache des artefacts |
+| `-b, --build-variant` | Variante de build (default, pic) |
+| `--base-package` | Package de base (défaut: fr.cnamts) |
+| `--dry-run` | Mode analyse sans génération |
+| `-v, --verbose` | Mode verbeux |
+
+### Artifactory
+| Option | Description |
+|--------|-------------|
 | `--artifactory-url` | URL Artifactory (optionnel) |
 | `--artifactory-cert` | Certificat SSL Artifactory |
 | `--artifactory-release-repo` | Repository releases (défaut: libs-release-local) |
 | `--artifactory-snapshot-repo` | Repository snapshots (défaut: libs-snapshot-local) |
 | `--artifactory-user` | Utilisateur Artifactory |
 | `--artifactory-password` | Mot de passe (ou env ARTIFACTORY_PASSWORD) |
+
+### Nexus
+| Option | Description |
+|--------|-------------|
 | `--nexus-url` | URL Nexus (optionnel) |
 | `--nexus-cert` | Certificat SSL Nexus |
 | `--nexus-repo` | Repository Nexus (défaut: maven-releases) |
 | `--nexus-user` | Utilisateur Nexus |
 | `--nexus-password` | Mot de passe (ou env NEXUS_PASSWORD) |
-| `--deploy-mode` | LOCAL ou REMOTE |
+
+### Déploiement
+| Option | Description |
+|--------|-------------|
+| `--deploy-mode` | LOCAL (repository .m2) ou REMOTE (upload) |
 | `--remote-target` | Cible REMOTE: ARTIFACTORY ou NEXUS |
-| `--auto-fix` | Compile et ajoute automatiquement les dépendances provided manquantes |
+| `--deploy-repo` | Nom du repository de déploiement |
+
+### Auto-fix
+| Option | Description |
+|--------|-------------|
+| `--auto-fix` | Compile et ajoute automatiquement les dépendances provided |
 | `--lib-provided` | Répertoire des librairies provided (défaut: lib-provided) |
+
+### Analyse CVE
+| Option | Description |
+|--------|-------------|
+| `--cve-check` | Active l'analyse des vulnérabilités CVE via NVD |
+| `--nvd-api-key` | Clé API NVD (National Vulnerability Database) |
+| `--cve-data-dir` | Répertoire de stockage base NVD (défaut: ~/.ant2maven/cve-data) |
+
+Vérifie chaque dépendance contre la base NVD pour identifier les CVE connues (CRITICAL, HIGH, MEDIUM, LOW). La base NVD est stockée de manière persistante pour éviter les re-téléchargements.
+
+### Analyse jdeps
+| Option | Description |
+|--------|-------------|
+| `--jdeps-analysis` | Active l'analyse structurelle des dépendances Java |
+
+Utilise l'outil `jdeps` pour analyser les dépendances au niveau packages. Supporte multi-modules et JARs multi-release.
+
+### Analyse SonarQube
+| Option | Description |
+|--------|-------------|
+| `--sonar-analysis` | Active l'analyse qualité SonarQube |
+| `--sonar-url` | URL du serveur SonarQube |
+| `--sonar-token` | Token d'authentification SonarQube |
+
+Évalue la qualité du code : bugs, vulnérabilités, code smells, dette technique.
+
+### Analyse OSS Index
+| Option | Description |
+|--------|-------------|
+| `--oss-analysis` | Active l'analyse de viabilité OSS |
+| `--ossindex-user` | Email utilisateur Sonatype OSS Index |
+| `--ossindex-token` | Token d'authentification OSS Index |
+
+Vérifie la viabilité des dépendances open-source via l'API Sonatype.
+
+### Scan cadre
+| Option | Description |
+|--------|-------------|
+| `--scan-cadre` | Active le scan des projets "cadre" multi-modules |
+
+Permet de migrer des projets multi-modules avec dépendances partagées.
+
+### Report-UI
+| Option | Description |
+|--------|-------------|
+| `--report-ui-url` | URL de l'interface Report-UI |
+
+Envoie le rapport vers l'interface web centralisée pour visualisation.
 
 ## Mode Auto-Fix
 
@@ -127,6 +197,53 @@ lib-provided/
 - `install-local-jars.sh` - Script installation locale (mode LOCAL)
 - `deploy-to-artifactory.sh` - Script déploiement Artifactory (mode REMOTE + target ARTIFACTORY)
 - `deploy-to-nexus.sh` - Script déploiement Nexus (mode REMOTE + target NEXUS)
+
+## Classes d'analyse
+
+| Classe | Analyse | API utilisée |
+|--------|---------|--------------|
+| `CveCheckService.java` | Vulnérabilités CVE | NVD (nvd.nist.gov) |
+| `JdepsAnalysisService.java` | Dépendances Java | Outil jdeps JDK |
+| `SonarAnalysisService.java` | Qualité code | SonarQube API |
+| `OssIndexService.java` | Viabilité OSS | Sonatype OSS Index |
+
+## Intégration Report-UI
+
+**Classe:** `report/ReportUiClient.java`
+
+Envoie le rapport complet vers Report-UI via POST `/api/reports` avec :
+- Type de migration (`migrationType`: ant2maven, toplink-to-jpa...)
+- Statistiques de résolution
+- Résultats des analyses (CVE, jdeps, Sonar, OSS)
+- Informations de déploiement
+
+## Exemple complet
+
+```bash
+java -jar ant2maven-1.0.0-SNAPSHOT.jar \
+  -p ./PRF2_A \
+  -o ./PRF2_A-maven \
+  --nexus-url http://localhost:8084 \
+  --nexus-user jenkins \
+  --nexus-password jenkins \
+  --deploy-mode REMOTE \
+  --remote-target NEXUS \
+  --deploy-repo migration-java-dette \
+  --auto-fix \
+  --known-artifacts ./conf-Ant2maven/known-artifacts.yaml \
+  --report-ui-url http://localhost:8090 \
+  --cve-check \
+  --nvd-api-key votre-cle-nvd \
+  --scan-cadre \
+  --jdeps-analysis \
+  --sonar-analysis \
+  --sonar-url http://localhost:9000 \
+  --sonar-token squ_xxxx \
+  --oss-analysis \
+  --ossindex-user user@example.com \
+  --ossindex-token token-oss \
+  -v
+```
 
 ## Clients Repository
 

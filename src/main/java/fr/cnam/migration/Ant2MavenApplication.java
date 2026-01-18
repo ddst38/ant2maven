@@ -243,6 +243,12 @@ public class Ant2MavenApplication implements Callable<Integer> {
     )
     private String nvdApiKey;
 
+    @Option(
+        names = {"--cve-data-dir"},
+        description = "Repertoire de stockage de la base NVD (defaut: ~/.ant2maven/cve-data)"
+    )
+    private String cveDataDir;
+
     // === Option Scan Cadre ===
 
     @Option(
@@ -574,7 +580,17 @@ public class Ant2MavenApplication implements Callable<Integer> {
                     effectiveNvdApiKey = System.getenv("NVD_API_KEY");
                 }
 
-                CveAnalyzer cveAnalyzer = new CveAnalyzer(effectiveNvdApiKey, verbose);
+                // Récupérer le répertoire de données CVE
+                String effectiveCveDataDir = cveDataDir;
+                if (effectiveCveDataDir == null || effectiveCveDataDir.isBlank()) {
+                    effectiveCveDataDir = System.getenv("CVE_DATA_DIR");
+                }
+                if (effectiveCveDataDir == null || effectiveCveDataDir.isBlank()) {
+                    // Défaut : ~/.ant2maven/cve-data
+                    effectiveCveDataDir = System.getProperty("user.home") + "/.ant2maven/cve-data";
+                }
+
+                CveAnalyzer cveAnalyzer = new CveAnalyzer(effectiveNvdApiKey, effectiveCveDataDir, verbose);
                 cveResult = cveAnalyzer.analyze(result.outputDir());
 
                 // Regénérer le rapport HTML avec les CVE
