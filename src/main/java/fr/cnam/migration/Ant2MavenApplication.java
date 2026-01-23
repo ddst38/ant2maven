@@ -688,9 +688,11 @@ public class Ant2MavenApplication implements Callable<Integer> {
                 log.info("Submitting report to ReportUI at {}...", reportUiUrl);
                 try {
                     ReportUiClient reportUiClient = new ReportUiClient(reportUiUrl, config.basePackage());
-                    // Collecter les librairies déployées si mode REMOTE
+                    // Collecter les librairies déployées si mode REMOTE ET compilation réussie
+                    // (les libs ne sont réellement uploadées que si la compilation a réussi)
                     List<ReportUiClient.DeployedLibrary> deployedLibraries = null;
-                    if (config.isRemoteDeployment()) {
+                    boolean compilationSuccess = fixResult != null && fixResult.isSuccess();
+                    if (config.isRemoteDeployment() && compilationSuccess) {
                         deployedLibraries = collectDeployedLibraries(analysis, fixResult, config);
                     }
                     reportUiClient.submitReport(project, analysis, fixResult, cveResult, jdepsResult, sonarResult, ossResult, config, deployedLibraries);

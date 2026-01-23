@@ -292,57 +292,68 @@ public class SonarQubeClient {
 
     /**
      * Parse les issues depuis le JSON.
+     * Utilise un parsing manuel pour gerer les objets JSON imbriques.
      */
     private List<SonarIssue> parseIssues(String json) {
         List<SonarIssue> issues = new ArrayList<>();
-
-        // Pattern plus complet pour extraire chaque issue
-        Pattern issueBlockPattern = Pattern.compile(
-            "\\{\"key\":\"([^\"]+)\"," +
-            "\"rule\":\"([^\"]+)\"," +
-            "[^}]*\"severity\":\"([^\"]+)\"," +
-            "[^}]*\"component\":\"([^\"]+)\"," +
-            "[^}]*\"message\":\"([^\"]*)\""
-        );
-
-        // Pattern alternatif si l'ordre des champs differe
-        Pattern altPattern = Pattern.compile(
-            "\\{[^}]*\"key\"\\s*:\\s*\"([^\"]+)\"[^}]*" +
-            "\"rule\"\\s*:\\s*\"([^\"]+)\"[^}]*" +
-            "\"severity\"\\s*:\\s*\"([^\"]+)\"[^}]*" +
-            "\"component\"\\s*:\\s*\"([^\"]+)\"[^}]*" +
-            "\"message\"\\s*:\\s*\"([^\"]*)\"[^}]*\\}"
-        );
 
         // Trouver la section "issues"
         int issuesStart = json.indexOf("\"issues\"");
         if (issuesStart < 0) return issues;
 
-        String issuesSection = json.substring(issuesStart);
+        // Trouver le debut du tableau
+        int arrayStart = json.indexOf('[', issuesStart);
+        if (arrayStart < 0) return issues;
 
-        // Parser chaque issue individuellement
-        Pattern singleIssue = Pattern.compile("\\{[^{}]+\\}");
-        Matcher blockMatcher = singleIssue.matcher(issuesSection);
+        // Parser chaque issue en comptant les accolades pour gerer les objets imbriques
+        int depth = 0;
+        int issueStart = -1;
 
-        while (blockMatcher.find()) {
-            String block = blockMatcher.group();
-            if (!block.contains("\"key\"")) continue;
+        for (int i = arrayStart; i < json.length(); i++) {
+            char c = json.charAt(i);
 
-            String key = extractField(block, "key");
-            String rule = extractField(block, "rule");
-            String severity = extractField(block, "severity");
-            String type = extractField(block, "type");
-            String message = extractField(block, "message");
-            String component = extractField(block, "component");
-            int line = parseInt(extractField(block, "line"));
-            String effort = extractField(block, "effort");
-
-            if (key != null && severity != null) {
-                issues.add(new SonarIssue(key, rule, severity, type, message, component, line, effort));
+            if (c == '{') {
+                if (depth == 0) {
+                    issueStart = i;
+                }
+                depth++;
+            } else if (c == '}') {
+                depth--;
+                if (depth == 0 && issueStart >= 0) {
+                    // On a trouve un objet issue complet
+                    String block = json.substring(issueStart, i + 1);
+                    SonarIssue issue = parseIssueBlock(block);
+                    if (issue != null) {
+                        issues.add(issue);
+                    }
+                    issueStart = -1;
+                }
+            } else if (c == ']' && depth == 0) {
+                // Fin du tableau issues
+                break;
             }
         }
 
         return issues;
+    }
+
+    /**
+     * Parse un bloc JSON representant une issue.
+     */
+    private SonarIssue parseIssueBlock(String block) {
+        String key = extractField(block, "key");
+        String rule = extractField(block, "rule");
+        String severity = extractField(block, "severity");
+        String type = extractField(block, "type");
+        String message = extractField(block, "message");
+        String component = extractField(block, "component");
+        int line = parseInt(extractField(block, "line"));
+        String effort = extractField(block, "effort");
+
+        if (key != null && severity != null) {
+            return new SonarIssue(key, rule, severity, type, message, component, line, effort);
+        }
+        return null;
     }
 
     /**
